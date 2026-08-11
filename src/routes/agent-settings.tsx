@@ -155,11 +155,17 @@ export function buildAgentProfileFields(
     toolConcurrency,
   } = input;
   if (isAcp) {
+    const provider = getAcpProvider(selectedPreset);
     const isBuiltinDefault =
-      isDefaultProviderCommand && selectedPreset !== ACP_CUSTOM_PRESET_KEY;
+      isDefaultProviderCommand &&
+      selectedPreset !== ACP_CUSTOM_PRESET_KEY &&
+      provider?.sdk_managed !== false;
     return {
       agent_kind: "acp",
-      acp_server: selectedPreset,
+      acp_server:
+        provider?.sdk_managed === false
+          ? ACP_CUSTOM_PRESET_KEY
+          : selectedPreset,
       acp_model: acpModel.trim() || null,
       acp_command: isBuiltinDefault
         ? null
@@ -316,18 +322,21 @@ export function AgentSettingsScreen({
       const rawAcpServer = source?.acp_server;
       const acpServer =
         typeof rawAcpServer === "string" ? rawAcpServer : undefined;
-      const provider = getAcpProvider(acpServer);
+      const backendProvider = getAcpProvider(acpServer);
       const storedCommand = toStringArray(source?.acp_command);
       const effectiveBaseCommand =
         storedCommand.length > 0
           ? storedCommand
-          : (provider?.default_command ?? []);
+          : (backendProvider?.default_command ?? []);
       const tokens = [
         ...effectiveBaseCommand,
         ...toStringArray(source?.acp_args),
       ];
       const renderedCommandText =
         tokens.length > 0 ? formatCommand(tokens) : "";
+      const detectedPreset = detectPreset(renderedCommandText, ACP_PROVIDERS);
+      const provider =
+        backendProvider ?? getAcpProvider(detectedPreset);
       setCommandText(renderedCommandText);
       loadedAcpServerRef.current = acpServer ?? null;
       loadedCommandTextRef.current = renderedCommandText;
@@ -336,7 +345,9 @@ export function AgentSettingsScreen({
       const normalizedSavedModel =
         typeof savedModel === "string" ? savedModel.trim() : "";
       setAcpModel(
-        normalizedSavedModel || getAcpPreferredDefaultModel(acpServer) || "",
+        normalizedSavedModel ||
+          getAcpPreferredDefaultModel(provider?.key ?? acpServer) ||
+          "",
       );
       setIsCustomAcpModel(
         !!normalizedSavedModel &&
@@ -477,7 +488,11 @@ export function AgentSettingsScreen({
     if (!settingsDirty) return;
 
     if (isAcp) {
-      const useDefault = !!(selectedProvider && isDefaultProviderCommand);
+      const useDefault = !!(
+        selectedProvider &&
+        selectedProvider.sdk_managed !== false &&
+        isDefaultProviderCommand
+      );
       const loadedServer = loadedAcpServerRef.current;
       const commandUnchanged = commandText === loadedCommandTextRef.current;
       const loadedServerIsUnknown =

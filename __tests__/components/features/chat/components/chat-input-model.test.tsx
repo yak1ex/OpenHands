@@ -158,7 +158,7 @@ describe("ChatInputModel", () => {
     renderWithProviders(<ChatInputModel />);
 
     const model = screen.getByTestId("chat-input-llm-model");
-    expect(model).toHaveAttribute("title", "gemini-2.5-pro");
+    expect(model).toHaveAttribute("title", "Gemini 2.5 Pro");
     fireEvent.click(model);
     expect(screen.getByRole("link")).toHaveAttribute(
       "href",
@@ -256,6 +256,35 @@ describe("ChatInputModel", () => {
     expect(selectedRow).toHaveTextContent("Claude Sonnet 4.6");
     expect(
       screen.getByTestId("chat-input-acp-model-option-opus[1m]"),
+    ).toBeInTheDocument();
+  });
+
+  it("recovers the Canvas-local OpenCode provider from the active model", () => {
+    useActiveConversationMock.mockReturnValue({
+      data: {
+        conversation_id: "test-conversation-id",
+        agent_kind: "acp",
+        acp_server: "custom",
+        llm_model: "opencode-go/deepseek-v4-pro",
+      },
+    });
+
+    renderWithProviders(<ChatInputModel />);
+
+    const model = screen.getByTestId("chat-input-llm-model");
+    expect(model).toHaveAttribute("title", "DeepSeek V4 Pro");
+
+    fireEvent.click(model);
+
+    const selectedRow = screen.getByTestId(
+      "chat-input-acp-model-option-opencode-go/deepseek-v4-pro",
+    );
+    expect(selectedRow).toBeInTheDocument();
+    expect(selectedRow).toHaveTextContent("DeepSeek V4 Pro");
+    expect(
+      screen.getByTestId(
+        "chat-input-acp-model-option-opencode-go/gpt-5.6-luna",
+      ),
     ).toBeInTheDocument();
   });
 
