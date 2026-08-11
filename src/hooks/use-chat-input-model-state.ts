@@ -9,6 +9,7 @@ import { useCanManageOrgProfiles } from "#/hooks/use-can-manage-org-profiles";
 import { useActiveAcpProfileDetail } from "#/hooks/query/use-active-acp-profile-detail";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
 import {
+  ACP_PROVIDERS,
   getAcpPreferredDefaultModel,
   getAcpProvider,
   labelForAcpModel,
@@ -56,8 +57,6 @@ export function useChatInputModelState(): ChatInputModelState {
     : isHomeAcp
       ? (activeAcpProfile?.acp_server ?? settingsAcpServerKey)
       : null;
-  const acpProvider = isAcpContext ? getAcpProvider(acpServerKey) : undefined;
-
   const settingsAcpModel =
     typeof settings?.agent_settings?.acp_model === "string"
       ? settings.agent_settings.acp_model
@@ -92,9 +91,25 @@ export function useChatInputModelState(): ChatInputModelState {
     currentModelId = conversation?.llm_model ?? settings?.llm_model ?? null;
   }
 
+  // Canvas-local ACP presets are persisted through the backend's generic
+  // ``custom`` server. Recover the Canvas provider from its namespaced model
+  // ID when the backend key itself does not identify a registered provider.
+  // SDK-managed providers always win because their ``acp_server`` resolves
+  // directly and never reaches this fallback.
+  const acpProvider = isAcpContext
+    ? (getAcpProvider(acpServerKey) ??
+      ACP_PROVIDERS.find((provider) =>
+        provider.available_models?.some(
+          (model) => model.id === currentModelId,
+        ),
+      ))
+    : undefined;
+  const effectiveAcpProviderKey = acpProvider?.key ?? acpServerKey;
+
   const displayModel =
     currentModelId && isAcpContext
-      ? (labelForAcpModel(acpServerKey, currentModelId) ?? currentModelId)
+      ? (labelForAcpModel(effectiveAcpProviderKey, currentModelId) ??
+        currentModelId)
       : currentModelId;
   const availableAcpModels = acpProvider?.available_models ?? [];
   // A home-page pick persists into the active ACP profile, which on cloud is
