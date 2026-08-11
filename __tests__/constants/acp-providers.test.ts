@@ -12,7 +12,7 @@ import {
 } from "#/constants/acp-providers";
 
 describe("getAcpProviderDisplayName", () => {
-  it("resolves the built-in registry keys to their human names", () => {
+  it("resolves registered provider keys to their human names", () => {
     expect(getAcpProviderDisplayName("claude-code")).toBe("Claude Code");
     expect(getAcpProviderDisplayName("codex")).toBe("Codex");
     expect(getAcpProviderDisplayName("gemini-cli")).toBe("Gemini CLI");
@@ -42,12 +42,14 @@ describe("getAcpProviderDisplayName", () => {
 });
 
 describe("ACP provider registry", () => {
-  it("sources display_name / default_command from the SDK, not a local mirror", () => {
-    // Core invariant of agent-canvas#678: the registry data fields must come
-    // straight from @openhands/typescript-client's getAcpProvider(), so the
-    // Python SDK stays the single source of truth. Only the UI-only overlay
-    // (icon + description_key) is layered on locally.
-    for (const provider of ACP_PROVIDERS) {
+  it("sources SDK-managed provider metadata from the SDK, not a local mirror", () => {
+    // Core invariant of agent-canvas#678: SDK-managed registry data fields must
+    // come straight from @openhands/typescript-client's getAcpProvider(), so the
+    // Python SDK stays the single source of truth for those providers. Canvas-
+    // local downstream providers are explicitly excluded from this invariant.
+    for (const provider of ACP_PROVIDERS.filter(
+      (provider) => provider.sdk_managed !== false,
+    )) {
       const sdk = getClientAcpProvider(provider.key);
       expect(sdk, provider.key).not.toBeNull();
       expect(provider.display_name).toBe(sdk!.display_name);
@@ -61,18 +63,83 @@ describe("ACP provider registry", () => {
     }
   });
 
+  it("supports the Canvas-local OpenCode provider", () => {
+    const provider = getAcpProvider("opencode");
+
+    expect(provider).toBeDefined();
+    expect(provider?.sdk_managed).toBe(false);
+    expect(provider?.display_name).toBe("OpenCode");
+    expect(provider?.default_command).toEqual(["opencode", "acp"]);
+    expect(provider?.default_model).toBe("opencode-go/gpt-5.6-luna");
+    expect(
+      provider?.available_models?.some(
+        (model) => model.id === "opencode-go/gpt-5.6-luna",
+      ),
+    ).toBe(true);
+
+    // OpenCode is deliberately Canvas-local rather than mirrored into the
+    // pinned @openhands/typescript-client.
+    expect(getClientAcpProvider("opencode")).toBeNull();
+  });
+
+  it("keeps every built-in default model in the UX suggestions", () => {
+    for (const provider of ACP_PROVIDERS) {
+      expect(provider.default_model, provider.key).toBeTruthy();
+      expect(provider.available_models, provider.key).toBeTruthy();
+      expect(
+        provider.available_models?.some(
+          (model) => model.id === provider.default_model,
+        ),
+        provider.key,
+      ).toBe(true);
+    }
+  });
+
+  it("does not suggest generic default model placeholders", () => {
+    // Model lists are SDK-owned (see ACP_PROVIDERS) — Canvas no longer hand-keeps
+    // them. The claude-code registry intentionally offers an id ``default``
+    // labeled "Default (recommended)", a legitimate, well-labeled choice. Guard
+    // against genuinely empty ids and bare placeholder labels, not the qualified
+    // "Default (recommended)" entry.
+    for (const provider of ACP_PROVIDERS) {
+      for (const model of provider.available_models ?? []) {
+        expect(model.id.trim(), provider.key).toBeTruthy();
+        expect(
+          model.label.trim().toLowerCase(),
+          `${provider.key}:${model.id}`,
+        ).not.toBe("default");
+      }
+    }
+  });
+
   it("seeds built-in ACP diffs with the provider's preferred default model", () => {
-    // EVERY default-model surface must agree with getAcpPreferredDefaultModel,
-    // including this diff builder's fallback.
+    // Preferred default = registry default everywhere except Gemini, where
+    // the Vertex-safe override applies (see getAcpPreferredDefaultModel) —
+    // EVERY default-model surface must agree on this, including this diff
+    // builder's fallback. Canvas-local providers persist through the backend's
+    // generic ``custom`` ACP server.
     for (const provider of ACP_PROVIDERS) {
       expect(buildAcpAgentSettingsDiff(provider.key)).toMatchObject({
         agent_kind: "acp",
-        acp_server: provider.key,
+        acp_server:
+          provider.sdk_managed === false
+            ? ACP_CUSTOM_PRESET_KEY
+            : provider.key,
         acp_model: getAcpPreferredDefaultModel(provider.key),
       });
     }
     expect(buildAcpAgentSettingsDiff("gemini-cli")).toMatchObject({
       acp_model: ACP_VERTEX_SAFE_MODEL,
+    });
+  });
+
+  it("maps Canvas-local providers to the backend custom ACP server", () => {
+    expect(buildAcpAgentSettingsDiff("opencode")).toMatchObject({
+      agent_kind: "acp",
+      acp_server: ACP_CUSTOM_PRESET_KEY,
+      acp_command: ["opencode", "acp"],
+      acp_args: [],
+      acp_model: "opencode-go/gpt-5.6-luna",
     });
   });
 
