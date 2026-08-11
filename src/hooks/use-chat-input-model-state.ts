@@ -12,6 +12,7 @@ import { useOptionalConversationId } from "#/hooks/use-conversation-id";
 import { useAcpModelDiscovery } from "#/hooks/query/use-acp-model-discovery";
 import { useAcpSessionModels } from "#/hooks/query/use-acp-session-models";
 import {
+  ACP_PROVIDERS,
   getAcpPreferredDefaultModel,
   getAcpProvider,
   labelForAcpModel,
@@ -65,16 +66,21 @@ export function useChatInputModelState(): ChatInputModelState {
     : isHomeAcp
       ? (activeAcpProfile?.acp_server ?? settingsAcpServerKey)
       : null;
-  const acpProvider = isAcpContext ? getAcpProvider(acpServerKey) : undefined;
+  const directAcpProvider = isAcpContext
+    ? getAcpProvider(acpServerKey)
+    : undefined;
   // The agent's models depend on the secrets it may use: the ones the
   // conversation launched with, or the next launch's from the active profile.
-  const discovered = useAcpModelDiscovery(acpProvider ? acpServerKey : null, {
+  const discovered = useAcpModelDiscovery(
+    directAcpProvider ? acpServerKey : null,
+    {
     enabled: isActiveAcpConversation || !!activeAcpProfile,
     secretRefs:
       (isActiveAcpConversation
         ? conversation?.launched_agent_profile?.secret_refs
         : activeAcpProfile?.secret_refs) ?? null,
-  });
+    },
+  );
   // The session's own list arrives only after it starts.
   const sessionModels = useAcpSessionModels(
     isActiveAcpConversation ? conversation : null,
@@ -112,14 +118,28 @@ export function useChatInputModelState(): ChatInputModelState {
     currentModelId = conversation?.llm_model ?? settings?.llm_model ?? null;
   }
 
+  // Canvas-local ACP presets are persisted through the backend's generic
+  // ``custom`` server. Recover the Canvas provider from its namespaced model.
+  const acpProvider = isAcpContext
+    ? (directAcpProvider ??
+      ACP_PROVIDERS.find((provider) =>
+        provider.available_models?.some(
+          (model) => model.id === currentModelId,
+        ),
+      ))
+    : undefined;
+  const availableAcpModels = isAcpContext
+    ? liveModels.length
+      ? liveModels
+      : (acpProvider?.available_models ?? [])
+    : [];
   let displayModel = currentModelId;
   if (isAcpContext) {
     displayModel =
-      labelForAcpModel(currentModelId, liveModels) ??
+      labelForAcpModel(currentModelId, availableAcpModels) ??
       // The next conversation starts on a default no one has reported yet.
       (isHomeAcp ? t(I18nKey.SETTINGS$AGENT_MODEL_AGENT_DEFAULT) : null);
   }
-  const availableAcpModels = isAcpContext ? liveModels : [];
   // A home-page pick persists into the active ACP profile, which on cloud is
   // org-owned — hide the selectable rows from members who'd only get a 403.
   // Conversation-scoped switches (blank or started) stay member-allowed.
