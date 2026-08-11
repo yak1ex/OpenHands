@@ -8,7 +8,6 @@ import { cn } from "#/utils/utils";
 import { useSaveSettings } from "#/hooks/mutation/use-save-settings";
 import {
   ACP_PROVIDER_FALLBACK_ICON,
-  ACP_PROVIDERS,
   buildAcpAgentSettingsDiff,
   getAcpProvidersForBackend,
 } from "#/constants/acp-providers";
@@ -74,9 +73,10 @@ interface AgentOption {
   descriptionKey: I18nKey;
 }
 
-// Onboarding tile list is *derived* from the ACP registry so adding a
-// new provider (or changing a display name) only needs one edit in
-// ``acp-providers.ts``. The OpenHands tile is the only synthetic
+// Onboarding tile list is derived from SDK-backed ACP providers that carry
+// onboarding metadata. Canvas-local presets may intentionally omit
+// ``description_key`` and therefore stay available in Settings / Agent Profiles
+// without becoming onboarding choices. The OpenHands tile is the only synthetic
 // entry — it isn't an ACP provider, just the canonical default.
 function getAgentOptions(backendKind: BackendKind): AgentOption[] {
   return [
@@ -85,11 +85,17 @@ function getAgentOptions(backendKind: BackendKind): AgentOption[] {
       label: "OpenHands",
       descriptionKey: I18nKey.ONBOARDING$AGENT_OPENHANDS_DESCRIPTION,
     },
-    ...getAcpProvidersForBackend(backendKind).map<AgentOption>((provider) => ({
-      id: provider.key as OnboardingAgentId,
-      label: provider.display_name,
-      descriptionKey: provider.description_key,
-    })),
+    ...getAcpProvidersForBackend(backendKind).flatMap<AgentOption>((provider) =>
+      provider.description_key
+        ? [
+            {
+              id: provider.key as OnboardingAgentId,
+              label: provider.display_name,
+              descriptionKey: provider.description_key,
+            },
+          ]
+        : [],
+    ),
   ];
 }
 
