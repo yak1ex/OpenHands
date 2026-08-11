@@ -96,6 +96,12 @@ export interface ACPProviderConfig {
    * still enter a custom override in Settings -> Agent.
    */
   available_models?: ACPModelOption[];
+  /**
+   * Whether the Python SDK knows this provider and can reconstruct its default
+   * command from ``acp_server`` alone. Canvas-local providers must keep their
+   * command explicit when settings or Agent Profiles are persisted.
+   */
+  sdk_managed?: boolean;
   /** Model ID preselected for built-in providers so Canvas never saves blank. */
   default_model?: string;
   /**
@@ -104,7 +110,9 @@ export interface ACPProviderConfig {
    * provider only requires editing this file (not the onboarding tile
    * list separately).
    */
-  description_key: I18nKey;
+  // Optional for Canvas-local providers that are intentionally excluded from
+  // onboarding.
+  description_key?: I18nKey;
   /**
    * Serializable icon key used by UI surfaces that render provider
    * choices. Kept as a string so the SDK mirror check can continue to
@@ -158,11 +166,11 @@ const ACP_PROVIDER_UI: Record<
 export const SURFACED_ACP_PROVIDERS: readonly string[] =
   Object.keys(ACP_PROVIDER_UI);
 
-// Built-in ACP providers Canvas surfaces, built by enriching each upstream
+// SDK-backed ACP providers Canvas surfaces, built by enriching each upstream
 // registry record (``@openhands/typescript-client`` → Python SDK) with the
 // Canvas UI metadata above. Model lists + defaults are no longer hand-kept
 // here (closes agent-canvas#740) — they track the SDK via the pinned client.
-export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
+const SDK_ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
   ACP_PROVIDER_UI,
 ).map(([key, ui]) => {
   const info = getClientAcpProvider(key);
@@ -175,10 +183,66 @@ export const ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
       label: model.label,
     })),
     default_model: info?.default_model ?? undefined,
+    sdk_managed: true,
     description_key: ui.description_key,
     icon: ui.icon,
   };
 });
+
+// BEGIN local downstream ACP providers
+//
+// OpenCode Go models are intentionally static. Update this list manually from:
+// https://opencode.ai/zen/go/v1/models
+//
+// OpenCode model IDs use the provider/model form ``opencode-go/<model-id>``.
+const OPENCODE_GO_MODELS: ACPModelOption[] = [
+  { id: "opencode-go/minimax-m3", label: "MiniMax M3" },
+  { id: "opencode-go/minimax-m2.7", label: "MiniMax M2.7" },
+  { id: "opencode-go/minimax-m2.5", label: "MiniMax M2.5" },
+  { id: "opencode-go/kimi-k3", label: "Kimi K3" },
+  { id: "opencode-go/kimi-k2.7-code", label: "Kimi K2.7 Code" },
+  { id: "opencode-go/kimi-k2.6", label: "Kimi K2.6" },
+  { id: "opencode-go/kimi-k2.5", label: "Kimi K2.5" },
+  { id: "opencode-go/glm-5.2", label: "GLM-5.2" },
+  { id: "opencode-go/glm-5.1", label: "GLM-5.1" },
+  { id: "opencode-go/glm-5", label: "GLM-5" },
+  { id: "opencode-go/deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+  { id: "opencode-go/deepseek-v4-flash", label: "DeepSeek V4 Flash" },
+  { id: "opencode-go/qwen3.7-max", label: "Qwen3.7 Max" },
+  { id: "opencode-go/qwen3.8-max", label: "Qwen3.8 Max" },
+  { id: "opencode-go/qwen3.7-plus", label: "Qwen3.7 Plus" },
+  { id: "opencode-go/qwen3.6-plus", label: "Qwen3.6 Plus" },
+  { id: "opencode-go/qwen3.5-plus", label: "Qwen3.5 Plus" },
+  { id: "opencode-go/mimo-v2-pro", label: "MiMo-V2-Pro" },
+  { id: "opencode-go/mimo-v2-omni", label: "MiMo-V2-Omni" },
+  { id: "opencode-go/mimo-v2.5-pro", label: "MiMo-V2.5-Pro" },
+  { id: "opencode-go/mimo-v2.5", label: "MiMo-V2.5" },
+  { id: "opencode-go/hy3", label: "Hy3" },
+  { id: "opencode-go/hy3-preview", label: "Hy3 Preview" },
+  { id: "opencode-go/gpt-5.6-luna", label: "GPT-5.6 Luna" },
+  { id: "opencode-go/grok-4.5", label: "Grok 4.5" },
+];
+
+const LOCAL_ACP_PROVIDERS: ACPProviderConfig[] = [
+  {
+    key: "opencode",
+    display_name: "OpenCode",
+    default_command: ["opencode", "acp"],
+    available_models: OPENCODE_GO_MODELS,
+    default_model: "opencode-go/gpt-5.6-luna",
+    sdk_managed: false,
+    icon: "cli-generic",
+  },
+];
+
+// Canvas-wide provider lookups include local downstream presets so Settings,
+// Agent Profiles, conversation labels, and model labels all recognize them.
+// Onboarding filters providers without ``description_key``.
+export const ACP_PROVIDERS: ACPProviderConfig[] = [
+  ...SDK_ACP_PROVIDERS,
+  ...LOCAL_ACP_PROVIDERS,
+];
+// END local downstream ACP providers
 
 export const ACP_CUSTOM_PRESET_KEY = "custom";
 
@@ -527,6 +591,18 @@ export function buildAcpAgentSettingsDiff(
     options.model === undefined
       ? getAcpPreferredDefaultModel(providerKey)
       : options.model;
+  // SDK-backed providers can reconstruct their default command from
+  // ``acp_server``. Canvas-local providers cannot, so keep their default command
+  // explicit unless the caller supplied another command.
+  const command =
+    options.command ??
+    (provider?.sdk_managed === false ? provider.default_command : []);
+
+  // Canvas-local providers are UI presets layered on top of the backend's
+  // generic ``custom`` ACP server. Keep their command/model metadata locally,
+  // but persist only backend-supported ``acp_server`` values.
+  const backendProviderKey =
+    provider?.sdk_managed === false ? ACP_CUSTOM_PRESET_KEY : providerKey;
 
   // ``acp_args: []`` resets any API-set ``acp_args`` that would
   // otherwise survive and concatenate to ``acp_command`` at spawn time
@@ -536,8 +612,8 @@ export function buildAcpAgentSettingsDiff(
   // ``acp_command`` here, so no args are lost.
   return {
     agent_kind: "acp",
-    acp_server: providerKey,
-    acp_command: options.command ?? [],
+    acp_server: backendProviderKey,
+    acp_command: command,
     acp_args: [],
     acp_model: model ?? null,
   };
