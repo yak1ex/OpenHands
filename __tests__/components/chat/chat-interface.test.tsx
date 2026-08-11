@@ -33,6 +33,10 @@ import { useConversationStore } from "#/stores/conversation-store";
 import { useGoalStore } from "#/stores/goal-store";
 import { act } from "@testing-library/react";
 
+const { handleBuildPlanClickMock } = vi.hoisted(() => ({
+  handleBuildPlanClickMock: vi.fn(),
+}));
+
 const mockSend = vi.fn();
 vi.mock("#/hooks/use-send-message", () => ({
   useSendMessage: () => ({ send: mockSend }),
@@ -48,6 +52,11 @@ vi.mock("#/hooks/use-llm-configured", () => ({
 vi.mock("#/hooks/use-conversation-id", () => ({
   useConversationId: vi.fn(),
   useOptionalConversationId: vi.fn(),
+}));
+vi.mock("#/hooks/use-handle-build-plan-click", () => ({
+  useHandleBuildPlanClick: () => ({
+    handleBuildPlanClick: handleBuildPlanClickMock,
+  }),
 }));
 
 vi.mock("#/hooks/use-user-providers", () => ({
@@ -145,6 +154,60 @@ beforeEach(() => {
     isLoading: false,
     hasMore: false,
     loadOlder: vi.fn().mockResolvedValue(undefined),
+  });
+});
+
+describe("ChatInterface - Build shortcut", () => {
+  beforeEach(() => {
+    handleBuildPlanClickMock.mockReset();
+    (useConfig as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { app_mode: "local" },
+    });
+    (
+      useUnifiedUploadFiles as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue({
+      mutateAsync: vi
+        .fn()
+        .mockResolvedValue({ skipped_files: [], uploaded_files: [] }),
+      isLoading: false,
+    });
+    vi.mocked(useAgentState).mockReturnValue({
+      curAgentState: AgentState.AWAITING_USER_INPUT,
+    });
+    useConversationStore.setState({
+      conversationMode: "code",
+      planContent: null,
+    });
+  });
+
+  it("does not build outside plan mode", () => {
+    useConversationStore.setState({ planContent: "# Plan" });
+    renderChatInterfaceWithRouter();
+
+    fireEvent.keyDown(document, { key: "Enter", ctrlKey: true });
+
+    expect(handleBuildPlanClickMock).not.toHaveBeenCalled();
+  });
+
+  it("does not build when no plan exists", () => {
+    useConversationStore.setState({ conversationMode: "plan" });
+    renderChatInterfaceWithRouter();
+
+    fireEvent.keyDown(document, { key: "Enter", ctrlKey: true });
+
+    expect(handleBuildPlanClickMock).not.toHaveBeenCalled();
+  });
+
+  it("builds in plan mode when a plan exists", () => {
+    useConversationStore.setState({
+      conversationMode: "plan",
+      planContent: "# Plan",
+    });
+    renderChatInterfaceWithRouter();
+
+    fireEvent.keyDown(document, { key: "Enter", ctrlKey: true });
+
+    expect(handleBuildPlanClickMock).toHaveBeenCalledOnce();
   });
 });
 

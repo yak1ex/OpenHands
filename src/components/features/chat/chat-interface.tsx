@@ -63,7 +63,8 @@ function getEntryPoint(
 
 export function ChatInterface() {
   const { trackInitialQuerySubmitted, trackUserMessageSent } = useTracking();
-  const { setMessageToSend } = useConversationStore();
+  const { setMessageToSend, conversationMode, planContent } =
+    useConversationStore();
   const { errorMessage, errorCode, removeErrorMessage, setErrorMessage } =
     useErrorMessageStore();
   const navigate = useNavigate();
@@ -125,12 +126,14 @@ export function ChatInterface() {
   const isAgentRunning =
     curAgentState === AgentState.RUNNING ||
     curAgentState === AgentState.LOADING;
+  const canBuildPlan =
+    !isAgentRunning && conversationMode === "plan" && Boolean(planContent);
 
   // Global keyboard shortcut for Build button (Cmd+Enter / Ctrl+Enter)
   // This is placed here instead of PlanPreview to avoid duplicate listeners
   // when multiple PlanPreview components exist in the chat
   React.useEffect(() => {
-    if (isAgentRunning) {
+    if (!canBuildPlan) {
       return undefined;
     }
 
@@ -149,7 +152,7 @@ export function ChatInterface() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isAgentRunning, handleBuildPlanClick, scrollDomToBottom]);
+  }, [canBuildPlan, handleBuildPlanClick, scrollDomToBottom]);
 
   const { selectedRepository, replayJson } = useInitialQueryStore();
   const { conversationId } = useOptionalConversationId();
