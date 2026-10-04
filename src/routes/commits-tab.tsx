@@ -11,6 +11,7 @@ import { useAgentState } from "#/hooks/use-agent-state";
 import { RuntimeWaitingState } from "#/components/features/conversation-panel/runtime-waiting-state";
 import { ConversationTabEmptyState } from "#/components/features/conversation/conversation-tab-empty-state";
 import { useConversationStore } from "#/stores/conversation-store";
+import { RepositoryBrowser } from "#/components/features/diff-viewer/repository-browser";
 
 /**
  * The Files tab's "Commits" view: the workspace's recent commit history
@@ -21,12 +22,13 @@ import { useConversationStore } from "#/stores/conversation-store";
 function GitCommits() {
   const { t } = useTranslation("openhands");
   const { conversationId } = useConversationId();
-  const { commits, hasMore, isUnsupported, isLoading, isSuccess } =
+  const { commits, hasMore, isUnsupported, isLoading, isSuccess, isError } =
     useUnifiedGitCommits();
   const {
     data: uncommittedChanges,
     isSuccess: uncommittedSuccess,
     isLoading: uncommittedLoading,
+    isError: uncommittedError,
   } = useUnifiedGetGitChanges();
   const commitsAutoExpandSection = useConversationStore(
     (state) => state.commitsAutoExpandSection,
@@ -50,6 +52,11 @@ function GitCommits() {
 
   return (
     <main className="h-full w-full flex flex-col items-stretch">
+      {(isError || uncommittedError) && (
+        <p role="alert" className="px-3 text-sm">
+          {t(I18nKey.FILES$LOAD_FAILED)}
+        </p>
+      )}
       {showList ? (
         <div className="h-full overflow-y-auto flex flex-col items-stretch custom-scrollbar-always">
           {/* Keyed by conversation so switching conversations collapses any
@@ -90,4 +97,10 @@ function GitCommits() {
   );
 }
 
-export default GitCommits;
+export default function CommitsTab() {
+  return (
+    <RepositoryBrowser>
+      <GitCommits />
+    </RepositoryBrowser>
+  );
+}

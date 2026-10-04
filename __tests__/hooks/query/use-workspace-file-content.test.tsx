@@ -133,11 +133,7 @@ describe("useWorkspaceFileContent", () => {
   });
 
   it("returns a static URL on the workspace fileserver for text content", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-      arrayBuffer: () => Promise.resolve(arrayBufferFromString("# Hello")),
-    });
+    downloadFileMock.mockResolvedValue(arrayBufferFromString("# Hello"));
 
     const { result } = renderHook(
       () => useWorkspaceFileContent("docs/readme.md"),
@@ -146,13 +142,12 @@ describe("useWorkspaceFileContent", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    // Revalidate instead of trusting the browser HTTP cache: the fileserver
-    // sends no Cache-Control, so an old file's body stays heuristically
-    // fresh and a Refresh would otherwise keep showing it (#17921).
-    expect(fetchMock).toHaveBeenCalledWith(
-      `${BASE_URL}docs/readme.md`,
-      expect.objectContaining({ credentials: "include", cache: "no-cache" }),
+    expect(downloadFileMock).toHaveBeenCalledWith(
+      "https://agent.example.com/api/conversations/conv-1",
+      "session-key",
+      "/workspace/project/docs/readme.md",
     );
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(result.current.data).toEqual({
       path: "docs/readme.md",
       kind: "text",
@@ -199,11 +194,7 @@ describe("useWorkspaceFileContent", () => {
 
   it("flips text → binary when the fetched bytes contain a NUL", async () => {
     const binary = new Uint8Array([0x01, 0x00, 0x02]).buffer;
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-      arrayBuffer: () => Promise.resolve(binary),
-    });
+    downloadFileMock.mockResolvedValue(binary);
 
     const { result } = renderHook(
       () => useWorkspaceFileContent("data/blob.bin"),
@@ -221,17 +212,9 @@ describe("useWorkspaceFileContent", () => {
   });
 
   it("refetches text content after a workspace mutation tick", async () => {
-    fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        arrayBuffer: () => Promise.resolve(arrayBufferFromString("first")),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        arrayBuffer: () => Promise.resolve(arrayBufferFromString("second")),
-      });
+    downloadFileMock
+      .mockResolvedValueOnce(arrayBufferFromString("first"))
+      .mockResolvedValueOnce(arrayBufferFromString("second"));
 
     const { result } = renderHook(
       () => useWorkspaceFileContent("docs/readme.md"),
@@ -245,7 +228,7 @@ describe("useWorkspaceFileContent", () => {
     });
 
     await waitFor(() => expect(result.current.data?.text).toBe("second"));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(downloadFileMock).toHaveBeenCalledTimes(2);
   });
 
   it("does not start a file request before a path is selected", async () => {
@@ -277,12 +260,10 @@ describe("useWorkspaceFileContent", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("surfaces a non-OK response as an error", async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 404,
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    });
+  it("surfaces a file API error", async () => {
+    downloadFileMock.mockRejectedValue(
+      new Error("Request failed with status 404"),
+    );
 
     const { result } = renderHook(
       () => useWorkspaceFileContent("missing.txt"),
@@ -293,8 +274,32 @@ describe("useWorkspaceFileContent", () => {
 
     expect(result.current.error).toEqual(
       expect.objectContaining({
-        message: "Failed to read missing.txt: 404",
+        message: "Request failed with status 404",
       }),
+    );
+  });
+
+  it("preserves a native Windows workspace root for authenticated reads", async () => {
+    useActiveConversationMock.mockReturnValue({
+      data: {
+        id: "conv-1",
+        conversation_url: "https://agent.example.com/api/conversations/conv-1",
+        session_api_key: "session-key",
+        workspace: { working_dir: "C:\\work\\group" },
+      },
+    });
+    downloadFileMock.mockResolvedValue(arrayBufferFromString("node_modules/"));
+
+    const { result } = renderHook(
+      () => useWorkspaceFileContent("OpenHands/.gitignore"),
+      { wrapper: makeWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(downloadFileMock).toHaveBeenCalledWith(
+      "https://agent.example.com/api/conversations/conv-1",
+      "session-key",
+      "C:\\work\\group/OpenHands/.gitignore",
     );
   });
 
