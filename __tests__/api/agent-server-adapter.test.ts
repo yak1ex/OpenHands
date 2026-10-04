@@ -240,7 +240,7 @@ describe("buildStartConversationRequest", () => {
       // source must be an absolute path to the skill's SKILL.md so the
       // Python agent-server can resolve bundled resources (scripts/, references/).
       const source = skill.source as string;
-      expect(source).toMatch(/^\//);
+      expect(source).toMatch(/^(?:\/|[A-Za-z]:[\\/]|\\\\)/);
       expect(source).toMatch(
         new RegExp(`/${skill.name as string}/SKILL\\.md$`),
       );
