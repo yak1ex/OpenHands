@@ -1430,6 +1430,7 @@ describe("profile launch additions", () => {
     const skills = additionsOf(payload)?.skills ?? [];
     expect(skills.map((skill) => skill.name)).toEqual([entry.name]);
     expect(skills[0].content).toBe(entry.content);
+    expect(skills[0].source).toMatch(/^(?:\/|[A-Za-z]:[\\/]|\\\\)/);
     expect(skills[0].source).toMatch(new RegExp(`/${entry.name}/SKILL\\.md$`));
   });
 
