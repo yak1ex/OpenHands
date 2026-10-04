@@ -74,7 +74,7 @@ describe("surfaced ACP providers", () => {
   // offer. Derived, so a harness added upstream is covered here without an
   // edit — the point of declaring what we surface rather than what we hide.
   const unsurfaced = Object.keys(CLIENT_ACP_PROVIDERS).filter(
-    (key) => !SURFACED_ACP_PROVIDERS.includes(key),
+    (key) => !ACP_PROVIDERS.some((provider) => provider.key === key),
   );
 
   it("surfaces Claude Code, Codex, Gemini CLI, Pi and OpenCode", () => {
