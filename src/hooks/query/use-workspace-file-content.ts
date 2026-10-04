@@ -10,6 +10,7 @@ import {
   useWorkspaceSession,
 } from "#/hooks/query/use-workspace-session";
 import { useWorkspaceMutationCounter } from "#/stores/use-workspace-mutation-counter";
+import AgentServerRuntimeService from "#/api/runtime-service/agent-server-runtime-service";
 
 // Magic-number sniff for common binary formats we can render via iframe.
 const IMAGE_EXTENSIONS = new Set([
@@ -167,9 +168,11 @@ export function useWorkspaceFileContent(relativePath: string | null) {
   // same way the diff view builds its git-diff path (see use-unified-git-diff),
   // then force a leading slash since `getGitPath`'s default is relative.
   const gitPath = getGitPath(selectedRepository, workingDir);
-  const workspaceRoot = gitPath.startsWith("/") ? gitPath : `/${gitPath}`;
+  const workspaceRoot = /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(gitPath)
+    ? gitPath
+    : `/${gitPath}`;
   const absoluteFilePath = relativePath
-    ? `${workspaceRoot}/${relativePath}`
+    ? `${workspaceRoot.replace(/[\\/]$/, "")}/${relativePath.replace(/^[/\\]+/, "")}`
     : null;
 
   return useQuery<WorkspaceFileContent>({
@@ -259,18 +262,14 @@ export function useWorkspaceFileContent(relativePath: string | null) {
         };
       }
 
-      // For our own fetch we also rely on the workspace-session cookie
-      // (it travels because we opt in to credentialed requests). This
-      // matches the auth path the iframe / <img> uses, and avoids a CORS
-      // preflight for a custom header.
-      const response = await fetch(staticUrl, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to read ${relativePath}: ${response.status}`);
-      }
-
-      const buffer = await response.arrayBuffer();
+      // Read text through the authenticated file API. The static fileserver
+      // remains useful for iframe/img previews, but its cookie can be absent
+      // or rejected even while the conversation session API key is valid.
+      const buffer = await AgentServerRuntimeService.downloadFile(
+        conversationUrl,
+        sessionApiKey,
+        absoluteFilePath!,
+      );
       if (isLikelyBinary(buffer)) {
         return {
           path: relativePath,
