@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useEventStore, type OHEvent } from "#/stores/use-event-store";
 import { useWorkspaceMutationCounter } from "#/stores/use-workspace-mutation-counter";
+import { GIT_REPOSITORIES_QUERY_KEY } from "#/context/git-repository-context";
 
 // `kind` values we treat as a file-mutation observation.
 const FILE_EDIT_OBSERVATION_KINDS = new Set([
@@ -135,6 +136,7 @@ export function useAutoRefreshFilesOnEdit(): void {
     queryClient.invalidateQueries({ queryKey: ["file_changes"] });
     queryClient.invalidateQueries({ queryKey: ["file_diff"] });
     queryClient.invalidateQueries({ queryKey: ["git_commits"] });
+    queryClient.invalidateQueries({ queryKey: [GIT_REPOSITORIES_QUERY_KEY] });
 
     if (hasNewFileEdits) {
       queryClient.invalidateQueries({ queryKey: ["workspace-files"] });

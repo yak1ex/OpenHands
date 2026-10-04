@@ -178,6 +178,16 @@ function FilesTab() {
       data-testid="files-tab"
     >
       <WorkspacePath path={workspacePath} />
+      {filesQuery.isError && (
+        <p role="alert" className="px-3 text-sm">
+          {t(I18nKey.FILES$LOAD_FAILED)}
+        </p>
+      )}
+      {filesQuery.isUnsupported && (
+        <p role="status" className="px-3 text-sm">
+          {t(I18nKey.FILES$SERVER_UPDATE_REQUIRED)}
+        </p>
+      )}
       {filesQuery.isTruncated && (
         <p
           role="status"

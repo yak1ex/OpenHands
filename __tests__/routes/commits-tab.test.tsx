@@ -10,8 +10,10 @@ import AgentServerGitService from "#/api/git-service/agent-server-git-service.ap
 import { useAgentState } from "#/hooks/use-agent-state";
 import { AgentState } from "#/types/agent-state";
 import type { GitCommit } from "#/api/open-hands.types";
+import { WorkspaceBrowserService } from "#/api/workspace-browser-service";
 
 const conversation = {
+  id: "c1",
   conversation_url: "http://localhost:18000/api/conversations/c1",
   session_api_key: "test-key",
   workspace: { working_dir: "/workspace/project" },
@@ -58,6 +60,7 @@ describe("Commits Tab", () => {
   const getGitChangesSpy = vi.spyOn(AgentServerGitService, "getGitChanges");
 
   beforeEach(() => {
+    vi.spyOn(WorkspaceBrowserService, "repositories").mockResolvedValue(null);
     getGitCommitsSpy.mockReset();
     getCommitChangesSpy.mockReset();
     getGitChangesSpy.mockReset();
@@ -67,7 +70,53 @@ describe("Commits Tab", () => {
     });
   });
 
-  it("shows the waiting state while the runtime is inactive", () => {
+  it("switches repository scope for history and per-commit changes", async () => {
+    vi.mocked(WorkspaceBrowserService.repositories).mockResolvedValue({
+      repositories: [{ path: "repo-a" }, { path: "group/repo-b" }],
+      truncated: false,
+    });
+    getGitCommitsSpy.mockResolvedValue({
+      commits: [makeCommit()],
+      hasMore: false,
+    });
+    getCommitChangesSpy.mockResolvedValue([]);
+    render(<GitCommits />, { wrapper });
+    const selector = await screen.findByRole("combobox");
+    await userEvent.selectOptions(selector, "group/repo-b");
+    await waitFor(() =>
+      expect(getGitCommitsSpy).toHaveBeenLastCalledWith(
+        conversation.conversation_url,
+        "test-key",
+        "/workspace/project/group/repo-b",
+        50,
+      ),
+    );
+    await userEvent.click(await screen.findByTestId("commit-row-toggle"));
+    await waitFor(() =>
+      expect(getCommitChangesSpy).toHaveBeenLastCalledWith(
+        conversation.conversation_url,
+        "test-key",
+        "/workspace/project/group/repo-b",
+        "a".repeat(40),
+      ),
+    );
+    expect(getGitChangesSpy).toHaveBeenLastCalledWith(
+      "c1",
+      conversation.conversation_url,
+      "test-key",
+      "/workspace/project/group/repo-b",
+      true,
+    );
+    await userEvent.selectOptions(selector, "repo-a");
+    await waitFor(() =>
+      expect(screen.getByTestId("commit-row-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      ),
+    );
+  });
+
+  it("shows the waiting state while the runtime is inactive", async () => {
     // Arrange
     vi.mocked(useAgentState).mockReturnValue({
       curAgentState: AgentState.ERROR,
@@ -78,7 +127,7 @@ describe("Commits Tab", () => {
     render(<GitCommits />, { wrapper });
 
     // Assert
-    expect(screen.getByTestId("commits-tab-status")).toBeInTheDocument();
+    expect(await screen.findByTestId("commits-tab-status")).toBeInTheDocument();
   });
 
   it("shows the empty state when the repository has no commits", async () => {

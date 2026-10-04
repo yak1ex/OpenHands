@@ -1,3 +1,4 @@
+import { useGitRepositoryPath } from "#/context/git-repository-context";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import AgentServerGitService from "#/api/git-service/agent-server-git-service.api";
@@ -18,6 +19,7 @@ type UseUnifiedGitDiffConfig = {
 };
 
 export const useUnifiedGitDiff = (config: UseUnifiedGitDiffConfig) => {
+  const repositoryPath = useGitRepositoryPath();
   const { conversationId } = useConversationId();
   const { data: conversation } = useActiveConversation();
 
@@ -27,9 +29,10 @@ export const useUnifiedGitDiff = (config: UseUnifiedGitDiffConfig) => {
   const workingDir = conversation?.workspace?.working_dir?.trim();
 
   const absoluteFilePath = React.useMemo(() => {
-    const gitPath = getGitPath(selectedRepository, workingDir);
+    const gitPath =
+      repositoryPath ?? getGitPath(selectedRepository, workingDir);
     return `${gitPath}/${config.filePath}`;
-  }, [selectedRepository, config.filePath, workingDir]);
+  }, [repositoryPath, selectedRepository, config.filePath, workingDir]);
 
   // Deleted files no longer exist on disk, so the agent server's
   // `/api/git/diff` endpoint returns a `GitPathError` (HTTP 400) for them.
@@ -50,6 +53,7 @@ export const useUnifiedGitDiff = (config: UseUnifiedGitDiffConfig) => {
         sessionApiKey,
         config.commit,
         absoluteFilePath,
+        repositoryPath,
       ]
     : [
         "file_diff",
@@ -57,6 +61,7 @@ export const useUnifiedGitDiff = (config: UseUnifiedGitDiffConfig) => {
         conversationUrl,
         sessionApiKey,
         absoluteFilePath,
+        repositoryPath,
       ];
 
   return useQuery({
@@ -70,6 +75,7 @@ export const useUnifiedGitDiff = (config: UseUnifiedGitDiffConfig) => {
         sessionApiKey,
         absoluteFilePath,
         config.commit,
+        repositoryPath,
       );
     },
     enabled: config.enabled && (!isDeleted || !!config.commit),
