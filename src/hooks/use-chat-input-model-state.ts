@@ -104,7 +104,9 @@ export function useChatInputModelState(): ChatInputModelState {
   if (isActiveAcpConversation) {
     // The settings may name another provider's model, so never fall back to them.
     currentModelId =
-      conversation?.llm_model ?? getAcpPreferredDefaultModel(acpServerKey);
+      conversation?.acp_current_model_id ??
+      conversation?.llm_model ??
+      getAcpPreferredDefaultModel(acpServerKey);
     selectedModelId = currentModelId;
   } else if (isHomeAcp) {
     selectedModelId = resolveEffectiveAcpModel({
@@ -123,9 +125,7 @@ export function useChatInputModelState(): ChatInputModelState {
   const acpProvider = isAcpContext
     ? (directAcpProvider ??
       ACP_PROVIDERS.find((provider) =>
-        provider.available_models?.some(
-          (model) => model.id === currentModelId,
-        ),
+        provider.available_models?.some((model) => model.id === currentModelId),
       ))
     : undefined;
   const availableAcpModels = isAcpContext

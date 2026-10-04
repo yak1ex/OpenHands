@@ -1266,6 +1266,10 @@ describe("toAppConversation", () => {
       ...baseInfo,
       current_model_id: "claude-sonnet-4-6",
       current_model_name: "Claude Sonnet",
+      available_models: [
+        { model_id: "claude-sonnet-4-6", name: "Claude Sonnet" },
+        { model_id: "account/model", name: null },
+      ],
       agent: {
         kind: "ACPAgent",
         acp_model: "claude-opus-4-7",
@@ -1274,6 +1278,11 @@ describe("toAppConversation", () => {
     });
     expect(result.agent_kind).toBe("acp");
     expect(result.llm_model).toBe("Claude Sonnet");
+    expect(result.acp_current_model_id).toBe("claude-sonnet-4-6");
+    expect(result.acp_available_models).toEqual([
+      { id: "claude-sonnet-4-6", label: "Claude Sonnet" },
+      { id: "account/model", label: "account/model" },
+    ]);
   });
 
   it("surfaces the runtime ACP default model over a configured acp_model", () => {

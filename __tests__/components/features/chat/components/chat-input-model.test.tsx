@@ -201,7 +201,7 @@ describe("ChatInputModel", () => {
     renderWithProviders(<ChatInputModel />);
 
     const model = screen.getByTestId("chat-input-llm-model");
-    expect(model).toHaveAttribute("title", "Gemini 2.5 Pro");
+    expect(model).toHaveAttribute("title", "gemini-2.5-pro");
     fireEvent.click(model);
     expect(screen.getByRole("link")).toHaveAttribute(
       "href",
@@ -328,6 +328,43 @@ describe("ChatInputModel", () => {
         "chat-input-acp-model-option-opencode-go/gpt-5.6-luna",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("uses advertised model IDs and labels instead of static suggestions", () => {
+    useActiveConversationMock.mockReturnValue({
+      data: {
+        conversation_id: "test-conversation-id",
+        agent_kind: "acp",
+        acp_server: "opencode",
+        llm_model: "Account Model",
+        acp_current_model_id: "account/model",
+        acp_available_models: [
+          { id: "account/model", label: "Account Model" },
+          { id: "account/other", label: "Other Model" },
+        ],
+      },
+    });
+    sessionModelsMock.mockReturnValue([
+      { id: "account/model", label: "Account Model" },
+      { id: "account/other", label: "Other Model" },
+    ]);
+    renderWithProviders(<ChatInputModel />);
+    fireEvent.click(screen.getByTestId("chat-input-llm-model"));
+    expect(
+      screen.getByTestId("chat-input-acp-model-option-account/model"),
+    ).toHaveTextContent("Account Model");
+    expect(
+      screen.queryByTestId(
+        "chat-input-acp-model-option-opencode-go/gpt-5.6-luna",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByTestId("chat-input-acp-model-option-account/other"),
+    );
+    expect(switchAcpModelMutate).toHaveBeenCalledWith({
+      conversationId: "test-conversation-id",
+      model: "account/other",
+    });
   });
 
   it("live-switches the model when a row is selected in an active ACP conversation", () => {

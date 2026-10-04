@@ -26,6 +26,7 @@ import {
 } from "#/utils/sdk-settings-schema";
 import {
   ACP_CUSTOM_PRESET_KEY,
+  ACP_PROVIDERS,
   getAcpPreferredDefaultModel,
   getAcpProvider,
   getAcpProvidersForBackend,
@@ -80,6 +81,15 @@ const EMPTY_AGENT_SETTINGS_SNAPSHOT: AgentSettingsSnapshot = {
   isCustomAcpModel: false,
 };
 
+function isKnownAcpModel(
+  provider: ACPProviderConfig | undefined,
+  model: string,
+): boolean {
+  return (
+    provider?.available_models?.some(({ id }) => id === model.trim()) ?? false
+  );
+}
+
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((v): v is string => typeof v === "string")
@@ -91,6 +101,9 @@ function detectPreset(
   providers: ACPProviderConfig[],
 ): string {
   const normalized = parseCommand(commandText).join(" ");
+  // Preserve the local preset's explicit executable when an old profile is
+  // edited, while saving it with the SDK's now-supported provider identity.
+  if (normalized === "opencode acp") return "opencode";
   for (const provider of providers) {
     if (normalized === provider.default_command.join(" ")) {
       return provider.key;
@@ -579,8 +592,7 @@ export function AgentSettingsScreen({
       const renderedCommandText =
         tokens.length > 0 ? formatCommand(tokens) : "";
       const detectedPreset = detectPreset(renderedCommandText, ACP_PROVIDERS);
-      const provider =
-        backendProvider ?? getAcpProvider(detectedPreset);
+      const provider = backendProvider ?? getAcpProvider(detectedPreset);
       setCommandText(renderedCommandText);
 
       const savedModel = agentSettingsOverride?.acp_model;

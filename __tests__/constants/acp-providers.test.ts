@@ -7,6 +7,7 @@ import {
   buildAcpAgentSettingsDiff,
   getAcpCredentialConflicts,
   getAcpPreferredDefaultModel,
+  getAcpProvider,
   getAcpProviderDisplayName,
   getAcpProviderSecrets,
 } from "#/constants/acp-providers";
@@ -48,7 +49,8 @@ describe("ACP provider registry", () => {
     // Python SDK stays the single source of truth for those providers. Canvas-
     // local downstream providers are explicitly excluded from this invariant.
     for (const provider of ACP_PROVIDERS.filter(
-      (provider) => provider.sdk_managed !== false,
+      (provider) =>
+        provider.description_key !== undefined && provider.key !== "opencode",
     )) {
       const sdk = getClientAcpProvider(provider.key);
       expect(sdk, provider.key).not.toBeNull();
@@ -63,36 +65,35 @@ describe("ACP provider registry", () => {
     }
   });
 
-  it("supports the Canvas-local OpenCode provider", () => {
+  it("uses upstream OpenCode with local Go suggestions", () => {
     const provider = getAcpProvider("opencode");
 
     expect(provider).toBeDefined();
-    expect(provider?.sdk_managed).toBe(false);
+    expect(provider?.sdk_managed).toBe(true);
     expect(provider?.display_name).toBe("OpenCode");
-    expect(provider?.default_command).toEqual(["opencode", "acp"]);
-    expect(provider?.default_model).toBe("opencode-go/gpt-5.6-luna");
+    expect(provider?.default_command).toEqual([
+      ...getClientAcpProvider("opencode")!.default_command,
+    ]);
+    expect(provider?.default_model).toBe(
+      getClientAcpProvider("opencode")!.default_model,
+    );
     expect(
       provider?.available_models?.some(
         (model) => model.id === "opencode-go/gpt-5.6-luna",
       ),
     ).toBe(true);
 
-    // OpenCode is deliberately Canvas-local rather than mirrored into the
-    // pinned @openhands/typescript-client.
-    expect(getClientAcpProvider("opencode")).toBeNull();
+    expect(getClientAcpProvider("opencode")).not.toBeNull();
   });
 
-  it("keeps every built-in default model in the UX suggestions", () => {
-    for (const provider of ACP_PROVIDERS) {
-      expect(provider.default_model, provider.key).toBeTruthy();
-      expect(provider.available_models, provider.key).toBeTruthy();
-      expect(
-        provider.available_models?.some(
-          (model) => model.id === provider.default_model,
-        ),
-        provider.key,
-      ).toBe(true);
-    }
+  it("keeps the OpenCode default model in its fallback suggestions", () => {
+    const provider = getAcpProvider("opencode");
+    expect(provider?.default_model).toBeTruthy();
+    expect(
+      provider?.available_models?.some(
+        (model) => model.id === provider.default_model,
+      ),
+    ).toBe(true);
   });
 
   it("does not suggest generic default model placeholders", () => {
@@ -122,9 +123,7 @@ describe("ACP provider registry", () => {
       expect(buildAcpAgentSettingsDiff(provider.key)).toMatchObject({
         agent_kind: "acp",
         acp_server:
-          provider.sdk_managed === false
-            ? ACP_CUSTOM_PRESET_KEY
-            : provider.key,
+          provider.sdk_managed === false ? ACP_CUSTOM_PRESET_KEY : provider.key,
         acp_model: getAcpPreferredDefaultModel(provider.key),
       });
     }
@@ -133,11 +132,11 @@ describe("ACP provider registry", () => {
     });
   });
 
-  it("maps Canvas-local providers to the backend custom ACP server", () => {
+  it("saves OpenCode using its upstream identity", () => {
     expect(buildAcpAgentSettingsDiff("opencode")).toMatchObject({
       agent_kind: "acp",
-      acp_server: ACP_CUSTOM_PRESET_KEY,
-      acp_command: ["opencode", "acp"],
+      acp_server: "opencode",
+      acp_command: [],
       acp_args: [],
       acp_model: "opencode-go/gpt-5.6-luna",
     });
@@ -249,9 +248,12 @@ describe("getAcpPreferredDefaultModel", () => {
   });
 
   it("leaves the other providers on their own default", () => {
-    for (const key of ["claude-code", "codex", "pi", "opencode"]) {
+    for (const key of ["claude-code", "codex", "pi"]) {
       expect(getAcpPreferredDefaultModel(key), key).toBeNull();
     }
+    expect(getAcpPreferredDefaultModel("opencode")).toBe(
+      "opencode-go/gpt-5.6-luna",
+    );
   });
 
   it("returns null for OpenHands / custom / unknown", () => {
