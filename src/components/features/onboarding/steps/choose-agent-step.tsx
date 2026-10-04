@@ -8,6 +8,7 @@ import { cn } from "#/utils/utils";
 import { useSaveSettings } from "#/hooks/mutation/use-save-settings";
 import {
   ACP_PROVIDER_FALLBACK_ICON,
+  ACP_PROVIDERS,
   buildAcpAgentSettingsDiff,
   getAcpProvidersForBackend,
 } from "#/constants/acp-providers";
@@ -85,16 +86,17 @@ function getAgentOptions(backendKind: BackendKind): AgentOption[] {
       label: "OpenHands",
       descriptionKey: I18nKey.ONBOARDING$AGENT_OPENHANDS_DESCRIPTION,
     },
-    ...getAcpProvidersForBackend(backendKind).flatMap<AgentOption>((provider) =>
-      provider.description_key
-        ? [
-            {
-              id: provider.key as OnboardingAgentId,
-              label: provider.display_name,
-              descriptionKey: provider.description_key,
-            },
-          ]
-        : [],
+    ...getAcpProvidersForBackend(backendKind).flatMap<AgentOption>(
+      (provider) =>
+        provider.description_key
+          ? [
+              {
+                id: provider.key as OnboardingAgentId,
+                label: provider.display_name,
+                descriptionKey: provider.description_key,
+              },
+            ]
+          : [],
     ),
   ];
 }

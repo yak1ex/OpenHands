@@ -448,6 +448,7 @@ export function toAppConversation(
     pr_number: [],
     agent_kind: isAcp ? "acp" : "openhands",
     acp_server: acpServer,
+    acp_current_model_id: isAcp ? info.current_model_id : undefined,
     acp_available_models: isAcp
       ? toAcpModelOptions(info.available_models)
       : null,

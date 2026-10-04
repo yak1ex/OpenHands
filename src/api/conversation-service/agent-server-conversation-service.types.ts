@@ -174,6 +174,7 @@ export interface AppConversation {
    * "ACP" chip when the key is unknown or null.
    */
   acp_server?: string | null;
+  acp_current_model_id?: string | null;
   /**
    * Models the conversation's ACP session offers, as its server reported them.
    * Empty before the session starts and on servers that don't report models.
