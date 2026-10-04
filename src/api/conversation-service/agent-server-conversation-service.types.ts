@@ -173,6 +173,8 @@ export interface AppConversation {
    * "ACP" chip when the key is unknown or null.
    */
   acp_server?: string | null;
+  acp_current_model_id?: string | null;
+  acp_available_models?: { id: string; name: string }[];
   /**
    * Server-side key-value tags from the agent-server's
    * ``ConversationInfo.tags`` (settable at creation and via

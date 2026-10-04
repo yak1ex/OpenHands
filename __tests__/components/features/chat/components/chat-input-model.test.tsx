@@ -288,6 +288,39 @@ describe("ChatInputModel", () => {
     ).toBeInTheDocument();
   });
 
+  it("uses advertised model IDs and labels instead of static suggestions", () => {
+    useActiveConversationMock.mockReturnValue({
+      data: {
+        conversation_id: "test-conversation-id",
+        agent_kind: "acp",
+        acp_server: "opencode",
+        llm_model: "Account Model",
+        acp_current_model_id: "account/model",
+        acp_available_models: [
+          { id: "account/model", name: "Account Model" },
+          { id: "account/other", name: "Other Model" },
+        ],
+      },
+    });
+    renderWithProviders(<ChatInputModel />);
+    fireEvent.click(screen.getByTestId("chat-input-llm-model"));
+    expect(
+      screen.getByTestId("chat-input-acp-model-option-account/model"),
+    ).toHaveTextContent("Account Model");
+    expect(
+      screen.queryByTestId(
+        "chat-input-acp-model-option-opencode-go/gpt-5.6-luna",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByTestId("chat-input-acp-model-option-account/other"),
+    );
+    expect(switchAcpModelMutate).toHaveBeenCalledWith({
+      conversationId: "test-conversation-id",
+      model: "account/other",
+    });
+  });
+
   it("live-switches the model when a row is selected in an active ACP conversation", () => {
     useActiveConversationMock.mockReturnValue({
       data: {

@@ -116,6 +116,7 @@ export interface DirectConversationInfo {
   } | null;
   current_model_id?: string | null;
   current_model_name?: string | null;
+  available_models?: { model_id: string; name?: string | null }[];
   workspace?: {
     working_dir?: string | null;
   } | null;
@@ -427,6 +428,13 @@ export function toAppConversation(
     pr_number: [],
     agent_kind: isAcp ? "acp" : "openhands",
     acp_server: acpServer,
+    acp_current_model_id: isAcp ? info.current_model_id : undefined,
+    acp_available_models: isAcp
+      ? info.available_models?.map((model) => ({
+          id: model.model_id,
+          name: model.name ?? model.model_id,
+        }))
+      : undefined,
     tags: info.tags ?? null,
     launched_agent_profile: info.launched_agent_profile ?? null,
     // Chip path: omit ``providerDefault`` so that when no concrete model
