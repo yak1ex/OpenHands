@@ -190,7 +190,8 @@ const SDK_ACP_PROVIDERS: ACPProviderConfig[] = Object.entries(
 
 // BEGIN local downstream ACP providers
 //
-// OpenCode Go models are intentionally static. Update this list manually from:
+// Fallback suggestions before ACP session discovery. Refresh with
+// scripts/update-opencode-go-models.mjs from:
 // https://opencode.ai/zen/go/v1/models
 //
 // OpenCode model IDs use the provider/model form ``opencode-go/<model-id>``.
@@ -222,14 +223,18 @@ const OPENCODE_GO_MODELS: ACPModelOption[] = [
   { id: "opencode-go/grok-4.5", label: "Grok 4.5" },
 ];
 
-const LOCAL_ACP_PROVIDERS: ACPProviderConfig[] = [
+const openCodeProvider = getClientAcpProvider("opencode")!;
+const ADDITIONAL_ACP_PROVIDERS: ACPProviderConfig[] = [
   {
     key: "opencode",
-    display_name: "OpenCode",
-    default_command: ["opencode", "acp"],
-    available_models: OPENCODE_GO_MODELS,
-    default_model: "opencode-go/gpt-5.6-luna",
-    sdk_managed: false,
+    display_name: openCodeProvider.display_name,
+    default_command: [...openCodeProvider.default_command],
+    available_models: [
+      ...(getAvailableModels("opencode") ?? []),
+      ...OPENCODE_GO_MODELS,
+    ],
+    default_model: openCodeProvider.default_model ?? undefined,
+    sdk_managed: true,
     icon: "cli-generic",
   },
 ];
@@ -239,7 +244,7 @@ const LOCAL_ACP_PROVIDERS: ACPProviderConfig[] = [
 // Onboarding filters providers without ``description_key``.
 export const ACP_PROVIDERS: ACPProviderConfig[] = [
   ...SDK_ACP_PROVIDERS,
-  ...LOCAL_ACP_PROVIDERS,
+  ...ADDITIONAL_ACP_PROVIDERS,
 ];
 // END local downstream ACP providers
 
@@ -402,6 +407,7 @@ export function getAcpPreferredDefaultModel(
   key: string | null | undefined,
 ): string | null {
   if (key === "gemini-cli") return ACP_VERTEX_SAFE_MODEL;
+  if (key === "opencode") return "opencode-go/gpt-5.6-luna";
   return getAcpProvider(key)?.default_model ?? null;
 }
 
