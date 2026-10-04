@@ -1,3 +1,4 @@
+import { useGitRepositoryPath } from "#/context/git-repository-context";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import AgentServerGitService from "#/api/git-service/agent-server-git-service.api";
@@ -8,6 +9,7 @@ import { getGitPath } from "#/utils/get-git-path";
 import type { GitChange } from "#/api/open-hands.types";
 
 export const useUnifiedGetGitChanges = () => {
+  const repositoryPath = useGitRepositoryPath();
   const { conversationId } = useConversationId();
   const { data: conversation } = useActiveConversation();
   const [orderedChanges, setOrderedChanges] = React.useState<GitChange[]>([]);
@@ -20,8 +22,8 @@ export const useUnifiedGetGitChanges = () => {
   const workingDir = conversation?.workspace?.working_dir?.trim();
 
   const gitPath = React.useMemo(
-    () => getGitPath(selectedRepository, workingDir),
-    [selectedRepository, workingDir],
+    () => repositoryPath ?? getGitPath(selectedRepository, workingDir),
+    [repositoryPath, selectedRepository, workingDir],
   );
 
   const result = useQuery({
@@ -31,6 +33,7 @@ export const useUnifiedGetGitChanges = () => {
       conversationUrl,
       sessionApiKey,
       gitPath,
+      !!repositoryPath,
     ],
     queryFn: async () => {
       if (!conversationId) throw new Error("No conversation ID");
@@ -40,6 +43,7 @@ export const useUnifiedGetGitChanges = () => {
         conversationUrl,
         sessionApiKey,
         gitPath,
+        !!repositoryPath,
       );
     },
     retry: false,
