@@ -11,6 +11,10 @@ import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useOptionalConversationId } from "#/hooks/use-conversation-id";
 import { useRuntimeIsReady } from "#/hooks/use-runtime-is-ready";
 import { getGitPath } from "#/utils/get-git-path";
+import {
+  WorkspaceBrowserService,
+  type WorkspaceFileList,
+} from "#/api/workspace-browser-service";
 
 // Cap the number of files we render so a giant repo doesn't freeze the UI.
 const MAX_FILES = 2000;
@@ -18,6 +22,9 @@ const MAX_FILES = 2000;
 export interface WorkspaceFilesResult {
   data: string[] | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  isUnsupported?: boolean;
+  truncated?: boolean;
 }
 
 // Directory names that we never want to descend into when listing files.
@@ -52,9 +59,8 @@ function normalizePath(path: string): string {
 }
 
 /**
- * Local-backend listing: enumerate every regular file beneath the active
- * conversation's working directory via `find` over the agent-server's
- * `/api/bash/execute_bash_command`, excluding common heavy/build directories.
+ * Local-backend listing uses Agent Server's portable, bounded file API.
+ * Older POSIX servers fall back to their existing shell listing.
  * Returns paths relative to the working dir (e.g. `src/index.html`).
  *
  * Local only: the browser can't drive `/api/bash/execute_bash_command` on a
@@ -71,7 +77,7 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
   const sessionApiKey = conversation?.session_api_key;
   const workingDir = conversation?.workspace?.working_dir?.trim();
 
-  const query = useQuery<string[]>({
+  const query = useQuery<WorkspaceFileList | null>({
     queryKey: [
       "workspace-files",
       conversationId,
@@ -80,6 +86,15 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
       workingDir,
     ],
     queryFn: async () => {
+      const listing = await WorkspaceBrowserService.listFiles(
+        conversationUrl,
+        sessionApiKey,
+        workingDir!,
+      );
+      if (listing !== null) return listing;
+      // Older servers have no portable enumeration endpoint. Never send a
+      // POSIX pipeline to a native Windows shell.
+      if (/^(?:[A-Za-z]:[\\/]|\\\\)/.test(workingDir!)) return null;
       const result = await AgentServerRuntimeService.executeCommand(
         conversationUrl,
         sessionApiKey,
@@ -96,12 +111,14 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
 
       const lines = result.stdout
         .split(/\r?\n/)
-        .map((line) => line.trim())
         .filter(Boolean)
         .map(normalizePath);
 
       // Defensive: keep results unique and bounded.
-      return Array.from(new Set(lines)).slice(0, MAX_FILES);
+      return {
+        files: Array.from(new Set(lines)).slice(0, MAX_FILES),
+        truncated: lines.length >= MAX_FILES,
+      };
     },
     enabled: enabled && runtimeIsReady && !!conversationId && !!workingDir,
     retry: false,
@@ -110,7 +127,13 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
     meta: { disableToast: true },
   });
 
-  return { data: query.data, isLoading: query.isLoading };
+  return {
+    data: query.data?.files,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    isUnsupported: query.data === null,
+    truncated: query.data?.truncated,
+  };
 }
 
 /**
@@ -167,8 +190,8 @@ function useCloudWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
 /**
  * Lists the files shown in the Files tab for the active conversation.
  *
- * Both backends enumerate the full workspace tree. Local backends run bash
- * `find` directly against the agent-server; cloud backends call the cloud
+ * Both backends enumerate the workspace tree. Local backends use the file
+ * listing API with a fallback for older POSIX servers; cloud backends call the cloud
  * API's first-class file-listing endpoint, which runs the same `find`
  * server-side on the conversation's runtime (see `useCloudWorkspaceFiles`).
  *

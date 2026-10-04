@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AgentServerRuntimeService from "#/api/runtime-service/agent-server-runtime-service";
 import { useWorkspaceFiles } from "#/hooks/query/use-workspace-files";
 import { listCloudConversationFiles } from "#/api/cloud/conversation-service.api";
+import { WorkspaceBrowserService } from "#/api/workspace-browser-service";
 
 // The hook reads cloud/local from the backend-registry store (the same source
 // the transport layer branches on), so drive the store snapshot in tests.
@@ -64,6 +65,7 @@ vi.mock("#/api/cloud/conversation-service.api", () => ({
 
 const executeCommandSpy = vi.spyOn(AgentServerRuntimeService, "executeCommand");
 const listCloudFilesMock = vi.mocked(listCloudConversationFiles);
+const listFilesSpy = vi.spyOn(WorkspaceBrowserService, "listFiles");
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -93,6 +95,7 @@ beforeEach(() => {
   useRuntimeIsReadyMock.mockReset();
   useOptionalConversationIdMock.mockReset();
   executeCommandSpy.mockReset();
+  listFilesSpy.mockReset().mockResolvedValue(null);
   listCloudFilesMock.mockReset();
 
   useRuntimeIsReadyMock.mockReturnValue(true);
@@ -106,6 +109,31 @@ afterEach(() => {
 });
 
 describe("useWorkspaceFiles — local backend", () => {
+  it("uses portable enumeration and preserves filename whitespace", async () => {
+    listFilesSpy.mockResolvedValue({
+      files: ["repo-a/ spaced .txt"],
+      truncated: true,
+    });
+    const { result } = renderHook(() => useWorkspaceFiles(), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() =>
+      expect(result.current.data).toEqual(["repo-a/ spaced .txt"]),
+    );
+    expect(result.current.truncated).toBe(true);
+    expect(executeCommandSpy).not.toHaveBeenCalled();
+  });
+
+  it("reports unsupported Windows servers without executing POSIX commands", async () => {
+    useActiveConversationMock.mockReturnValue({
+      data: { ...conversation, workspace: { working_dir: "C:\\work" } },
+    });
+    const { result } = renderHook(() => useWorkspaceFiles(), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isUnsupported).toBe(true));
+    expect(executeCommandSpy).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     storeBackendKind = "local";
   });

@@ -170,6 +170,21 @@ function FilesTab() {
       data-testid="files-tab"
     >
       <WorkspacePath path={workspacePath} />
+      {filesQuery.isError && (
+        <p role="alert" className="px-3 text-sm">
+          {t(I18nKey.FILES$LOAD_FAILED)}
+        </p>
+      )}
+      {filesQuery.isUnsupported && (
+        <p role="status" className="px-3 text-sm">
+          {t(I18nKey.FILES$SERVER_UPDATE_REQUIRED)}
+        </p>
+      )}
+      {filesQuery.truncated && (
+        <p role="status" className="px-3 text-sm">
+          {t(I18nKey.FILES$LIST_TRUNCATED)}
+        </p>
+      )}
       {filesQuery.isLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted">
           {t(I18nKey.FILES$LOADING_FILES)}
