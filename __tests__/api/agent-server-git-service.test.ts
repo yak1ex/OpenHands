@@ -41,6 +41,22 @@ describe("AgentServerGitService", () => {
   });
 
   describe("getGitChanges", () => {
+    test("scopes Windows repository requests and normalizes returned file paths", async () => {
+      mockClientGet.mockResolvedValue({
+        data: [{ status: "UPDATED", path: "src\\main.py" }],
+      });
+      const changes = await AgentServerGitService.getGitChanges(
+        "123",
+        "http://localhost:3000/api/conversations/123",
+        "key",
+        "C:\\work\\repo",
+        true,
+      );
+      expect(mockClientGet).toHaveBeenCalledWith("/api/git/changes", {
+        params: { path: "C:\\work\\repo", include_nested: "false" },
+      });
+      expect(changes).toEqual([{ status: "M", path: "src/main.py" }]);
+    });
     test("throws when response is not an array (dead runtime returns HTML)", async () => {
       mockGitChanges.mockResolvedValue("<!DOCTYPE html><html>...</html>");
 

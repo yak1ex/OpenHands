@@ -52,7 +52,7 @@ interface AgentServerGitCommitsPage {
  * default; normalize to an absolute path before sending to the runtime.
  */
 function toAbsoluteRuntimePath(path: string): string {
-  return path.startsWith("/") ? path : `/${path}`;
+  return /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(path) ? path : `/${path}`;
 }
 
 /**
@@ -103,8 +103,24 @@ class AgentServerGitService {
     conversationUrl: string | null | undefined,
     sessionApiKey: string | null | undefined,
     path: string,
+    repositoryOnly = false,
   ): Promise<GitChange[]> {
     const active = getActiveBackend().backend;
+
+    if (repositoryOnly) {
+      const changes = await getFromRuntime<AgentServerGitChange[]>(
+        conversationUrl,
+        sessionApiKey,
+        "/api/git/changes",
+        { path, include_nested: "false" },
+      );
+      return changes.map((change) => ({
+        path: change.path.replace(/\\/g, "/"),
+        status: mapAnyGitStatusToClientStatus(
+          change.status as Parameters<typeof mapAnyGitStatusToClientStatus>[0],
+        ),
+      }));
+    }
 
     if (active.kind === "cloud" && conversationId) {
       const params = new URLSearchParams();
@@ -125,7 +141,7 @@ class AgentServerGitService {
             typeof mapAnyGitStatusToClientStatus
           >[0],
         ),
-        path: change.path,
+        path: change.path.replace(/\\/g, "/"),
       }));
     }
 
@@ -153,7 +169,7 @@ class AgentServerGitService {
           typeof mapAnyGitStatusToClientStatus
         >[0],
       ),
-      path: change.path,
+      path: change.path.replace(/\\/g, "/"),
     }));
   }
 
@@ -217,7 +233,7 @@ class AgentServerGitService {
           typeof mapAnyGitStatusToClientStatus
         >[0],
       ),
-      path: change.path,
+      path: change.path.replace(/\\/g, "/"),
     }));
   }
 
@@ -227,13 +243,18 @@ class AgentServerGitService {
     sessionApiKey: string | null | undefined,
     path: string,
     commit?: string,
+    repositoryPath?: string,
   ): Promise<GitChangeDiff> {
     if (commit) {
       // Per-commit diff: both sides come from git objects on the server,
       // so files the commit deleted still render.
       const commitDiff = await getFromRuntime<
         GitChangeDiff & { diff?: string }
-      >(conversationUrl, sessionApiKey, "/api/git/diff", { path, commit });
+      >(conversationUrl, sessionApiKey, "/api/git/diff", {
+        path,
+        commit,
+        ...(repositoryPath ? { repository: repositoryPath } : {}),
+      });
       return {
         modified: commitDiff?.modified ?? "",
         original: commitDiff?.original ?? "",
@@ -242,6 +263,16 @@ class AgentServerGitService {
     }
 
     const active = getActiveBackend().backend;
+
+    if (repositoryPath) {
+      const diff = await getFromRuntime<GitChangeDiff>(
+        conversationUrl,
+        sessionApiKey,
+        "/api/git/diff",
+        { path },
+      );
+      return { original: diff.original ?? "", modified: diff.modified ?? "" };
+    }
 
     if (active.kind === "cloud" && conversationId) {
       const params = new URLSearchParams();

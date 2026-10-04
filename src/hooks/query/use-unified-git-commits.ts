@@ -1,3 +1,4 @@
+import { useGitRepositoryPath } from "#/context/git-repository-context";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import AgentServerGitService from "#/api/git-service/agent-server-git-service.api";
@@ -9,6 +10,7 @@ import { getGitPath } from "#/utils/get-git-path";
 export const COMMITS_PAGE_LIMIT = 50;
 
 export const useUnifiedGitCommits = () => {
+  const repositoryPath = useGitRepositoryPath();
   const { conversationId } = useConversationId();
   const { data: conversation } = useActiveConversation();
   const runtimeIsReady = useRuntimeIsReady();
@@ -19,8 +21,8 @@ export const useUnifiedGitCommits = () => {
   const workingDir = conversation?.workspace?.working_dir?.trim();
 
   const gitPath = React.useMemo(
-    () => getGitPath(selectedRepository, workingDir),
-    [selectedRepository, workingDir],
+    () => repositoryPath ?? getGitPath(selectedRepository, workingDir),
+    [repositoryPath, selectedRepository, workingDir],
   );
 
   const result = useQuery({
