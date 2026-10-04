@@ -75,6 +75,7 @@ export function useChatInputModelState(): ChatInputModelState {
     // creation time). Use it directly if available; fall back to the
     // settings-configured model or provider default so the chip stays visible.
     currentModelId =
+      conversation?.acp_current_model_id ??
       conversation?.llm_model ??
       resolveEffectiveAcpModel({
         configured: acpConfiguredModel,
@@ -99,19 +100,24 @@ export function useChatInputModelState(): ChatInputModelState {
   const acpProvider = isAcpContext
     ? (getAcpProvider(acpServerKey) ??
       ACP_PROVIDERS.find((provider) =>
-        provider.available_models?.some(
-          (model) => model.id === currentModelId,
-        ),
+        provider.available_models?.some((model) => model.id === currentModelId),
       ))
     : undefined;
   const effectiveAcpProviderKey = acpProvider?.key ?? acpServerKey;
 
+  const runtimeModels = isActiveAcpConversation
+    ? conversation?.acp_available_models
+    : undefined;
+  const availableAcpModels = runtimeModels?.length
+    ? runtimeModels.map((model) => ({ id: model.id, label: model.name }))
+    : (acpProvider?.available_models ?? []);
   const displayModel =
     currentModelId && isAcpContext
-      ? (labelForAcpModel(effectiveAcpProviderKey, currentModelId) ??
+      ? (availableAcpModels.find((model) => model.id === currentModelId)
+          ?.label ??
+        labelForAcpModel(effectiveAcpProviderKey, currentModelId) ??
         currentModelId)
       : currentModelId;
-  const availableAcpModels = acpProvider?.available_models ?? [];
   // A home-page pick persists into the active ACP profile, which on cloud is
   // org-owned — hide the selectable rows from members who'd only get a 403.
   // Conversation-scoped switches (blank or started) stay member-allowed.

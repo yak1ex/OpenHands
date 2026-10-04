@@ -90,6 +90,9 @@ function detectPreset(
   providers: ACPProviderConfig[],
 ): string {
   const normalized = parseCommand(commandText).join(" ");
+  // Preserve the local preset's explicit executable when an old profile is
+  // edited, while saving it with the SDK's now-supported provider identity.
+  if (normalized === "opencode acp") return "opencode";
   for (const provider of providers) {
     if (normalized === provider.default_command.join(" ")) {
       return provider.key;
@@ -572,8 +575,7 @@ export function AgentSettingsScreen({
       const renderedCommandText =
         tokens.length > 0 ? formatCommand(tokens) : "";
       const detectedPreset = detectPreset(renderedCommandText, ACP_PROVIDERS);
-      const provider =
-        backendProvider ?? getAcpProvider(detectedPreset);
+      const provider = backendProvider ?? getAcpProvider(detectedPreset);
       setCommandText(renderedCommandText);
       loadedAcpServerRef.current = acpServer ?? null;
       loadedCommandTextRef.current = renderedCommandText;
