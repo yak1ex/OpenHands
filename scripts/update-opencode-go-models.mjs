@@ -93,7 +93,7 @@ function generateLabel(modelId) {
 function parseExistingLabels(block) {
   const labels = new Map();
   const itemPattern =
-    /\{\s*id:\s*"opencode-go\/([^"]+)",\s*label:\s*"([^"]+)"\s*\}/g;
+    /\{\s*id:\s*"opencode-go\/([^"]+)",\s*label:\s*"([^"]+)",?\s*\}/g;
 
   for (const match of block.matchAll(itemPattern)) {
     labels.set(match[1], match[2]);
@@ -106,7 +106,10 @@ function renderModels(modelIds, existingLabels) {
   return modelIds
     .map((modelId) => {
       const label = existingLabels.get(modelId) ?? generateLabel(modelId);
-      return `  { id: "${MODEL_PREFIX}${modelId}", label: "${label}" },`;
+      const item = `  { id: "${MODEL_PREFIX}${modelId}", label: "${label}" },`;
+      return item.length <= 80
+        ? item
+        : `  {\n    id: "${MODEL_PREFIX}${modelId}",\n    label: "${label}",\n  },`;
     })
     .join("\n");
 }
@@ -140,7 +143,9 @@ async function fetchModelIds() {
   const unique = [...new Set(ids)];
 
   if (unique.length !== ids.length) {
-    throw new Error("Unexpected OpenCode Go models response: duplicate model ids");
+    throw new Error(
+      "Unexpected OpenCode Go models response: duplicate model ids",
+    );
   }
 
   if (unique.length === 0) {
@@ -152,9 +157,7 @@ async function fetchModelIds() {
 
 async function main() {
   const checkOnly = process.argv.slice(2).includes("--check");
-  const unknownArgs = process.argv
-    .slice(2)
-    .filter((arg) => arg !== "--check");
+  const unknownArgs = process.argv.slice(2).filter((arg) => arg !== "--check");
 
   if (unknownArgs.length > 0) {
     throw new Error(`Unknown argument(s): ${unknownArgs.join(", ")}`);
@@ -181,7 +184,9 @@ async function main() {
     source.slice(blockMatch.index + blockMatch[0].length);
 
   if (updated === source) {
-    console.log(`OpenCode Go model list is already up to date (${modelIds.length} models).`);
+    console.log(
+      `OpenCode Go model list is already up to date (${modelIds.length} models).`,
+    );
     return;
   }
 
@@ -192,7 +197,9 @@ async function main() {
   const added = modelIds.filter((id) => !oldIdSet.has(id));
   const removed = oldIds.filter((id) => !newIdSet.has(id));
 
-  console.log(`OpenCode Go model catalog changed: ${oldIds.length} -> ${modelIds.length}`);
+  console.log(
+    `OpenCode Go model catalog changed: ${oldIds.length} -> ${modelIds.length}`,
+  );
   if (added.length > 0) {
     console.log(`Added:   ${added.join(", ")}`);
   }
