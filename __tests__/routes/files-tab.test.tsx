@@ -343,15 +343,15 @@ describe("FilesTab", () => {
       isError: false,
     });
 
-    openFile("index.html");
-    renderTab();
+    openFile("index.html", "conv-1");
+    renderTab("conv-1");
 
     const iframe = await screen.findByTestId("file-content-viewer-iframe");
     expect(iframe).toHaveAttribute("src", `${staticUrl}?v=0`);
     expect(iframe).toHaveAttribute("sandbox", "allow-same-origin");
   });
 
-  it("re-requests the rich preview and the new-window link on Refresh", async () => {
+  it("re-requests the rich preview and updates the Canvas preview link on Refresh", async () => {
     useWorkspaceFilesMock.mockReturnValue({
       data: ["index.html"],
       isLoading: false,
@@ -371,8 +371,8 @@ describe("FilesTab", () => {
     });
     const user = userEvent.setup();
 
-    openFile("index.html");
-    renderTab();
+    openFile("index.html", "conv-1");
+    renderTab("conv-1");
     const iframe = await screen.findByTestId("file-content-viewer-iframe");
     const srcBefore = iframe.getAttribute("src");
 
@@ -387,9 +387,7 @@ describe("FilesTab", () => {
     });
     expect(
       screen.getByTestId("files-tab-open-in-new-window").getAttribute("href"),
-    ).toBe(
-      screen.getByTestId("file-content-viewer-iframe").getAttribute("src"),
-    );
+    ).toBe("/conversations/conv-1/workspace-preview?path=index.html&version=1");
   });
 
   it("switches between rich and plain content modes", async () => {
@@ -494,13 +492,13 @@ describe("FilesTab", () => {
   });
 
   it("shows the Rich/Plain toggle only when a file is open", async () => {
-    renderTab();
+    renderTab("conv-1");
 
     expect(
       screen.queryByTestId("files-tab-content-mode-toggle"),
     ).not.toBeInTheDocument();
 
-    openFile("index.html");
+    openFile("index.html", "conv-1");
 
     const modeToggle = await screen.findByTestId(
       "files-tab-content-mode-toggle",

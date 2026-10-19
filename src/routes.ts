@@ -47,4 +47,8 @@ export default [
     "shared/conversations/:conversationId",
     "routes/shared-conversation.tsx",
   ),
+  route(
+    "conversations/:conversationId/workspace-preview",
+    "routes/workspace-file-preview.tsx",
+  ),
 ] satisfies RouteConfig;
