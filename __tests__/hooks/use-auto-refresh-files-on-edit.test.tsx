@@ -21,8 +21,9 @@ function makeObservationEvent(
 ): OHEvent {
   return {
     id,
-    timestamp: new Date(Date.now() + Number(id.replace(/\D/g, "")) * 1000)
-      .toISOString(),
+    timestamp: new Date(
+      Date.now() + Number(id.replace(/\D/g, "")) * 1000,
+    ).toISOString(),
     source: "environment",
     tool_name: "str_replace_based_edit_tool",
     tool_call_id: `tc-${id}`,
@@ -76,7 +77,7 @@ describe("useAutoRefreshFilesOnEdit", () => {
   });
 
   it.each(["ExecuteBashObservation", "TerminalObservation"])(
-    "refreshes only the git diff queries when a %s arrives",
+    "refreshes workspace content after %s without reloading rich previews",
     (kind) => {
       // Arrange
       const client = new QueryClient();
@@ -93,17 +94,20 @@ describe("useAutoRefreshFilesOnEdit", () => {
           .addEvent(makeObservationEvent("1", kind, "git commit -m 'done'"));
       });
 
-      // Assert — the diff and commit-list queries refresh, and nothing
-      // else does (workspace file queries on every shell command would
-      // churn the Files tab; per-commit queries are immutable).
+      // Assert: shell writes refresh text without forcing iframe reloads.
       const invalidatedKeys = spy.mock.calls.map(
         (call) => (call[0] as { queryKey: unknown[] }).queryKey[0],
       );
-      expect(invalidatedKeys).toEqual([
-        "file_changes",
-        "file_diff",
-        "git_commits",
-      ]);
+      expect(invalidatedKeys).toEqual(
+        expect.arrayContaining([
+          "file_changes",
+          "file_diff",
+          "git_commits",
+          "workspace-files",
+          "workspace-file-content",
+        ]),
+      );
+      expect(useWorkspaceMutationCounter.getState().count).toBe(0);
     },
   );
 
@@ -184,11 +188,7 @@ describe("useAutoRefreshFilesOnEdit", () => {
       useEventStore
         .getState()
         .addEvent(
-          makeObservationEvent(
-            "2",
-            "StrReplaceEditorObservation",
-            "create",
-          ),
+          makeObservationEvent("2", "StrReplaceEditorObservation", "create"),
         );
     });
     expect(useWorkspaceMutationCounter.getState().count).toBe(2);
@@ -207,9 +207,7 @@ describe("useAutoRefreshFilesOnEdit", () => {
         .addEvent(makeObservationEvent("1", "FileEditorObservation", "view"));
       useEventStore
         .getState()
-        .addEvent(
-          makeObservationEvent("2", "ExecuteBashObservation", "ls"),
-        );
+        .addEvent(makeObservationEvent("2", "ExecuteBashObservation", "ls"));
     });
 
     expect(useWorkspaceMutationCounter.getState().count).toBe(0);
@@ -234,10 +232,14 @@ describe("useAutoRefreshFilesOnEdit", () => {
     act(() => {
       useEventStore
         .getState()
-        .addEvent(makeObservationEvent("10", "FileEditorObservation", "create"));
+        .addEvent(
+          makeObservationEvent("10", "FileEditorObservation", "create"),
+        );
       useEventStore
         .getState()
-        .addEvent(makeObservationEvent("20", "FileEditorObservation", "create"));
+        .addEvent(
+          makeObservationEvent("20", "FileEditorObservation", "create"),
+        );
     });
     const callsAfterInitial = spy.mock.calls.length;
     expect(callsAfterInitial).toBeGreaterThan(0);
