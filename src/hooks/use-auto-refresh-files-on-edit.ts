@@ -55,12 +55,9 @@ function isBashObservation(event: OHEvent): boolean {
  * diff view in sync with what the agent has actually written to disk,
  * without requiring the user to click refresh manually.
  *
- * Bash observations also refresh the git-diff queries (`file_changes` /
- * `file_diff`) — a `git commit` or `git push` changes what the Diff view
- * should display, and shell commands can edit files too. They deliberately
- * do NOT touch the workspace file queries or the workspace mutation
- * counter: bumping the counter reloads canvas iframes, and doing that for
- * every shell command the agent runs would cause constant flicker.
+ * Bash observations refresh workspace and git queries because shell commands
+ * can edit files too. They leave the workspace mutation counter alone to avoid
+ * reloading rich previews for every shell command.
  * Invalidation only refetches actively-mounted queries, so the cost is
  * limited to when the Files tab is open.
  *
@@ -138,9 +135,10 @@ export function useAutoRefreshFilesOnEdit(): void {
     queryClient.invalidateQueries({ queryKey: ["git_commits"] });
     queryClient.invalidateQueries({ queryKey: [GIT_REPOSITORIES_QUERY_KEY] });
 
+    queryClient.invalidateQueries({ queryKey: ["workspace-files"] });
+    queryClient.invalidateQueries({ queryKey: ["workspace-file-content"] });
+
     if (hasNewFileEdits) {
-      queryClient.invalidateQueries({ queryKey: ["workspace-files"] });
-      queryClient.invalidateQueries({ queryKey: ["workspace-file-content"] });
       // Force iframes / <img> tags pointing at the static workspace
       // fileserver to re-fetch. Without this they happily keep showing the
       // stale (browser-cached) bytes even after the agent has rewritten the
