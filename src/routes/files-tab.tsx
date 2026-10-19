@@ -14,10 +14,7 @@ import {
   getConversationState,
   useConversationLocalStorageState,
 } from "#/utils/conversation-local-storage";
-import {
-  useWorkspaceMutationCounter,
-  withWorkspaceCacheBuster,
-} from "#/stores/use-workspace-mutation-counter";
+import { useWorkspaceMutationCounter } from "#/stores/use-workspace-mutation-counter";
 import { FileQuickRow } from "#/components/features/files-tab/file-quick-row";
 import { FileTreeView } from "#/components/features/files-tab/file-tree-view";
 import { FileContentViewer } from "#/components/features/files-tab/file-content-viewer";
@@ -36,6 +33,7 @@ import { ResizeHandle } from "#/components/ui/resize-handle";
 import RefreshIcon from "#/icons/u-refresh.svg?react";
 import LinkExternalIcon from "#/icons/link-external.svg?react";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
+import { buildWorkspaceFilePreviewUrl } from "#/utils/workspace-file-preview-url";
 
 /**
  * Workspace file browser. Diff/Commits live in the sibling Commits
@@ -115,10 +113,14 @@ function FilesTab() {
   const bumpWorkspaceMutationCounter = useWorkspaceMutationCounter(
     (state) => state.bump,
   );
-  const selectedFileStaticUrl = withWorkspaceCacheBuster(
-    selectedFileContent.data?.staticUrl ?? null,
-    mutationCounter,
-  );
+  const selectedFilePreviewUrl =
+    conversationId && selectedFileContent.data
+      ? buildWorkspaceFilePreviewUrl(
+          conversationId,
+          selectedFileContent.data.path,
+          mutationCounter,
+        )
+      : null;
 
   // Restore open tabs / selection from conversation-scoped localStorage on
   // mount and when switching conversations (survives a full page refresh).
@@ -249,9 +251,9 @@ function FilesTab() {
                       ]}
                       onChange={setFilesTabContentViewMode}
                     />
-                    {selectedFileStaticUrl ? (
+                    {selectedFilePreviewUrl ? (
                       <a
-                        href={selectedFileStaticUrl}
+                        href={selectedFilePreviewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={t(I18nKey.FILES$OPEN_IN_NEW_WINDOW)}
