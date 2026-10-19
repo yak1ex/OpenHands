@@ -23,8 +23,8 @@ import {
   useConversationLocalStorageState,
 } from "#/utils/conversation-local-storage";
 import {
-  useWorkspaceMutationCounter,
   withWorkspaceCacheBuster,
+  useWorkspaceMutationCounter,
 } from "#/stores/use-workspace-mutation-counter";
 import { FileQuickRow } from "#/components/features/files-tab/file-quick-row";
 import { FileTreeView } from "#/components/features/files-tab/file-tree-view";
@@ -45,6 +45,7 @@ import RefreshIcon from "#/icons/u-refresh.svg?react";
 import LinkExternalIcon from "#/icons/link-external.svg?react";
 import DownloadIcon from "#/icons/u-download.svg?react";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
+import { buildWorkspaceFilePreviewUrl } from "#/utils/workspace-file-preview-url";
 
 /**
  * Workspace file browser. Diff/Commits live in the sibling Commits
@@ -158,6 +159,15 @@ function FilesTab() {
   const downloadableFile =
     selectedFile && (!isDataUrl || selectedFile.text !== null)
       ? selectedFile
+      : null;
+  const selectedFilePreviewUrl = isDataUrl
+    ? selectedFileStaticUrl
+    : conversationId && selectedFileContent.data
+      ? buildWorkspaceFilePreviewUrl(
+          conversationId,
+          selectedFileContent.data.path,
+          mutationCounter,
+        )
       : null;
 
   // Restore open tabs / selection from conversation-scoped localStorage on
@@ -307,9 +317,9 @@ function FilesTab() {
                           <DownloadIcon width={14} height={14} />
                         </button>
                       ) : null}
-                      {selectedFileStaticUrl ? (
+                      {selectedFilePreviewUrl ? (
                         <a
-                          href={selectedFileStaticUrl}
+                          href={selectedFilePreviewUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={t(I18nKey.FILES$OPEN_IN_NEW_WINDOW)}

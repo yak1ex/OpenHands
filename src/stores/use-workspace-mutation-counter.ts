@@ -27,8 +27,9 @@ import { create } from "zustand";
  *     the rich preview re-requests.
  *   - {@link useWorkspaceFileContent} reads the count via its query key so
  *     the hook refetches after each bump.
- *   - `FileContentViewer` / files-tab "open in new tab" link append the
- *     count to the static URL via {@link withWorkspaceCacheBuster}.
+ *   - `FileContentViewer` appends the count to the static URL via
+ *     {@link withWorkspaceCacheBuster}; the Files tab carries the count into
+ *     its full-window preview route, which applies the same cache-buster.
  */
 interface WorkspaceMutationCounterState {
   count: number;
