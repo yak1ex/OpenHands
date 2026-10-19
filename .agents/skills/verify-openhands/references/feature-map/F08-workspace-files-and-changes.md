@@ -10,7 +10,7 @@ first. Each expands into per-file Monaco diffs with old/diff/new modes. The
 Terminal, Browser, Planner, Task list and Usage tab bodies belong to F27. The
 Files tab downloads the selected file; it has no upload or edit.
 
-Source: `src/components/features/conversation/conversation-tabs/`, `src/components/features/conversation/right-panel-toggle.tsx`, `src/components/features/conversation/conversation-main/`, `src/routes/conversation.tsx`, `src/hooks/use-conversation-panel-route.ts`, `src/routes/conversation-panel.tsx`, `src/routes/files-tab.tsx`, `src/components/features/files-tab/`, `src/hooks/query/use-workspace-files.ts`, `src/hooks/query/use-workspace-file-content.ts`, `src/hooks/use-download-workspace-file.ts`, `src/hooks/use-auto-refresh-files-on-edit.ts`, `src/routes/commits-tab.tsx`, `src/components/features/diff-viewer/`, `src/services/canvas-ui.ts`.
+Source: `src/components/features/conversation/conversation-tabs/`, `src/components/features/conversation/right-panel-toggle.tsx`, `src/components/features/conversation/conversation-main/`, `src/routes/conversation.tsx`, `src/hooks/use-conversation-panel-route.ts`, `src/routes/conversation-panel.tsx`, `src/routes/files-tab.tsx`, `src/routes/workspace-file-preview.tsx`, `src/components/features/files-tab/`, `src/hooks/query/use-workspace-files.ts`, `src/hooks/query/use-workspace-file-content.ts`, `src/hooks/use-download-workspace-file.ts`, `src/hooks/use-auto-refresh-files-on-edit.ts`, `src/routes/commits-tab.tsx`, `src/components/features/diff-viewer/`, `src/services/canvas-ui.ts`.
 
 Server: F13, F14, F15, F16.
 
@@ -37,7 +37,7 @@ Server: F13, F14, F15, F16.
 - `F08.files-rich-plain`: Rich highlights code, renders Markdown and shows HTML in an iframe sandboxed without scripts. Plain shows highlighted source. The mode persists across reloads.
 - `F08.files-fallbacks`: images render as `<img>` in Rich mode. Files with NUL bytes show `Binary file – preview not available`, and Office files show `Preview isn't available for Word files.` (or PowerPoint/Excel).
 - `F08.files-load-error`: a selected file that can no longer be read shows the error (`Failed to read <path>: 404`).
-- `F08.files-open-new-window`: the external-link icon opens the file from the workspace fileserver in a new browser tab, for every file type on a local backend (Markdown shows as raw text), from the drawer and from the phone panel page. On a Cloud backend, whose file reads come back as `data:` URLs, the icon opens the file's text as a same-origin `text/plain` `blob:` URL that follows Refresh, and files without decoded text (images, PDFs, binaries) have no icon (blocked locally).
+- `F08.files-open-new-window`: on a local backend, the external-link icon opens a full-window Canvas preview in a new browser tab; the workspace file remains in an iframe so its partitioned session cookie stays valid. Cloud text files retain the text/plain blob preview; Cloud files without decoded text have no icon.
 - `F08.files-download`: the `Download` button left of the external-link icon saves the selected file under its own name, byte for byte (text, images, binaries, files in subfolders); a failed read toasts `Could not download this file`. It is absent with no file selected or when the file failed to load, and on a Cloud backend for files without decoded text (blocked locally).
 - `F08.files-refresh`: `Refresh files` re-reads the file list and the selected file's content, on a Cloud backend too (blocked locally).
 - `F08.files-auto-refresh`: files the agent writes appear without a manual refresh.
