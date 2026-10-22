@@ -75,7 +75,7 @@ describe("ACP provider registry", () => {
       ...getClientAcpProvider("opencode")!.default_command,
     ]);
     expect(provider?.default_model).toBe(
-      getClientAcpProvider("opencode")!.default_model,
+      getAcpPreferredDefaultModel("opencode"),
     );
     expect(
       provider?.available_models?.some(
