@@ -15,6 +15,7 @@ import { Settings } from "#/types/settings";
 import {
   ACP_PROVIDERS,
   ACP_VERTEX_SAFE_MODEL,
+  getAcpProvider,
 } from "#/constants/acp-providers";
 import {
   __resetActiveStoreForTests,
@@ -370,6 +371,42 @@ describe("AgentSettingsScreen", () => {
       });
     },
   );
+
+  it("offers the preset's bundled model list when the command overrides its default", async () => {
+    // Discovery would re-spawn the preset default, not this command, so the
+    // picker must fall back to the bundled suggestions instead of waiting on
+    // a conversation-reported list that never arrives while overridden.
+    const user = userEvent.setup();
+    const { control } = renderAgentSettingsScreen({
+      agentSettingsOverride: {
+        agent_kind: "acp",
+        acp_server: "opencode",
+        acp_command: ["opencode", "acp"],
+        acp_model: null,
+      },
+    });
+
+    await screen.findByTestId("agent-model-selector");
+    expect(
+      screen.queryByTestId("agent-model-list-after-first-conversation"),
+    ).toBeNull();
+
+    const bundled = getAcpProvider("opencode")!.available_models!;
+    expect(bundled.length).toBeGreaterThan(0);
+    const target = bundled[bundled.length - 1];
+
+    const modelInput = screen.getByLabelText("SETTINGS$AGENT_MODEL");
+    await user.click(modelInput);
+    await user.clear(modelInput);
+    await user.type(modelInput, target.label);
+    await user.click(await screen.findByRole("option", { name: target.label }));
+
+    expect(control().buildAgentProfileFields()).toMatchObject({
+      acp_server: "opencode",
+      acp_command: "opencode acp",
+      acp_model: target.id,
+    });
+  });
 
   it("clears the model when switching from a built-in provider to Custom", async () => {
     // Picking Custom must not leak the built-in default model onto an
