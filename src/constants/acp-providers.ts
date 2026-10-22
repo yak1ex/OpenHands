@@ -179,13 +179,6 @@ const ACP_PROVIDER_UI: Record<
 export const SURFACED_ACP_PROVIDERS: readonly string[] =
   Object.keys(ACP_PROVIDER_UI);
 
-function getAvailableModels(key: string): ACPModelOption[] | undefined {
-  return getClientAcpProvider(key)?.available_models?.map((model) => ({
-    id: model.id,
-    label: model.label,
-  }));
-}
-
 // SDK-backed ACP providers Canvas surfaces, built by enriching each upstream
 // registry record (``@openhands/typescript-client`` → Python SDK) with the
 // Canvas UI metadata above. Model lists + defaults are no longer hand-kept
@@ -276,11 +269,8 @@ const ADDITIONAL_ACP_PROVIDERS: ACPProviderConfig[] = [
     key: "opencode",
     display_name: openCodeProvider.display_name,
     default_command: [...openCodeProvider.default_command],
-    available_models: [
-      ...(getAvailableModels("opencode") ?? []),
-      ...OPENCODE_GO_MODELS,
-    ],
-    default_model: openCodeProvider.default_model ?? undefined,
+    available_models: OPENCODE_GO_MODELS,
+    default_model: "opencode-go/gpt-5.6-luna",
     sdk_managed: true,
     icon: "cli-generic",
     local_only: true,

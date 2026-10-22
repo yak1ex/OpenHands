@@ -124,15 +124,6 @@ const EMPTY_AGENT_SETTINGS_SNAPSHOT: AgentSettingsSnapshot = {
   isCustomAcpModel: false,
 };
 
-function isKnownAcpModel(
-  provider: ACPProviderConfig | undefined,
-  model: string,
-): boolean {
-  return (
-    provider?.available_models?.some(({ id }) => id === model.trim()) ?? false
-  );
-}
-
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((v): v is string => typeof v === "string")
@@ -746,9 +737,7 @@ export function AgentSettingsScreen({
         normalizedSavedModel ||
         getAcpPreferredDefaultModel(provider?.key ?? acpServer) ||
         "";
-      const nextIsCustomAcpModel =
-        !!normalizedSavedModel &&
-        (!provider || !isKnownAcpModel(provider, normalizedSavedModel));
+      const nextIsCustomAcpModel = !!normalizedSavedModel && !provider;
       setAcpModel(nextAcpModel);
       setIsCustomAcpModel(nextIsCustomAcpModel);
       setLoadedSnapshot({
@@ -1049,8 +1038,18 @@ export function AgentSettingsScreen({
 
   if (isLoading) return null;
 
+  // An overridden command never runs the model discovery lookup (it would
+  // re-spawn the preset's default command, not this one), so the agent's own
+  // list can't be asked or remembered here. Presets that ship a bundled
+  // suggestion list (the local OpenCode Go preset) surface it instead of an
+  // empty picker whose "after your first conversation" promise would never
+  // resolve while the override stays.
+  const overrideModelFallback =
+    isAcp && !isDefaultProviderCommand
+      ? (selectedProvider?.available_models ?? [])
+      : [];
   const modelSuggestions = buildModelSuggestions(
-    liveModels.models,
+    liveModels.models.length ? liveModels.models : overrideModelFallback,
     isCustomAcpModel ? "" : acpModel,
   );
   const agentDefaultModelLabel = labelForAcpModel(
@@ -1071,6 +1070,7 @@ export function AgentSettingsScreen({
       };
     }
     if (liveModels.source === "none") {
+      if (overrideModelFallback.length > 0) return null;
       return {
         testId: "agent-model-list-after-first-conversation",
         key: I18nKey.SETTINGS$AGENT_MODEL_LIST_AFTER_FIRST_CONVERSATION,
