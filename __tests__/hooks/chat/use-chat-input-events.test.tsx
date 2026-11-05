@@ -18,14 +18,18 @@ const createKeyboardEvent = ({
   key = "Enter",
   composing = false,
   shiftKey = false,
+  ctrlKey = false,
 }: {
   key?: string;
   composing?: boolean;
   shiftKey?: boolean;
+  ctrlKey?: boolean;
 } = {}) =>
   ({
     key,
     shiftKey,
+    ctrlKey,
+    stopPropagation: vi.fn(),
     nativeEvent: { isComposing: composing },
     preventDefault: vi.fn(),
   }) as unknown as React.KeyboardEvent;
@@ -192,7 +196,10 @@ describe("chat input keyboard events", () => {
     const isEmpty = vi.fn(() => false);
     const { result } = renderInputEvents({ isEmpty });
     const letter = createKeyboardEvent({ key: "a" });
-    const composingEnter = createKeyboardEvent({ composing: true });
+    const composingEnter = createKeyboardEvent({
+      composing: true,
+      ctrlKey: true,
+    });
     const submit = vi.fn();
 
     act(() => {
@@ -222,21 +229,40 @@ describe("chat input keyboard events", () => {
     expect(submit).not.toHaveBeenCalled();
   });
 
-  it("submits non-empty content on desktop Enter", () => {
+  it("submits non-empty content on Ctrl+Enter without triggering global shortcuts", () => {
     vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(
       "Mozilla/5.0 (X11; Linux x86_64)",
     );
     const { result } = renderInputEvents();
-    const event = createKeyboardEvent();
+    const event = createKeyboardEvent({ ctrlKey: true });
     const submit = vi.fn();
 
     act(() => result.current.handleKeyDown(event, false, submit));
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
     expect(submit).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+  });
+
+  it("does not submit disabled Ctrl+Enter or let it trigger Build", () => {
+    const { result } = renderInputEvents();
+    const event = createKeyboardEvent({ ctrlKey: true });
+    const submit = vi.fn();
+
+    act(() => result.current.handleKeyDown(event, true, submit));
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(submit).not.toHaveBeenCalled();
   });
 
   it.each([
+    {
+      label: "desktop Enter",
+      userAgent: "Mozilla/5.0 (X11; Linux x86_64)",
+      shiftKey: false,
+      disabled: false,
+    },
     {
       label: "mobile Enter",
       userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
