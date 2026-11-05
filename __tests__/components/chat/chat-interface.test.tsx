@@ -1044,7 +1044,7 @@ describe("ChatInterface - Saved draft after submit", () => {
       renderInterface();
       const input = await typeAndWaitForSavedDraft(command);
 
-      fireEvent.keyDown(input, { key: "Enter" });
+      fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
 
       expect(input).toHaveTextContent("");
       expect(getConversationState(CONVERSATION_ID).draftMessage).toBeNull();
@@ -1056,7 +1056,7 @@ describe("ChatInterface - Saved draft after submit", () => {
     renderInterface();
     const input = await typeAndWaitForSavedDraft("hello");
 
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
 
     await waitFor(() => expect(mockSend).toHaveBeenCalled());
     expect(getConversationState(CONVERSATION_ID).draftMessage).toBe("hello");
@@ -1629,7 +1629,7 @@ describe("ChatInterface - initial attachment recovery", () => {
     const submittedRevision = getConversationDraftRevision(
       "test-conversation-id",
     );
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
     await waitFor(() => expect(upload).toHaveBeenCalledOnce());
 
     // The same text typed again while upload is in flight is a different draft.
@@ -1701,14 +1701,14 @@ describe("ChatInterface - initial attachment recovery", () => {
         "Read my notes",
       ),
     );
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
     await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(useConversationStore.getState().files).toEqual([file]),
     );
     expect(mockSend).not.toHaveBeenCalled();
     await waitFor(() => expect(input).toHaveTextContent("Read my notes"));
-    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
     expect(useErrorMessageStore.getState().errorMessage).toBeNull();
     page.unmount();

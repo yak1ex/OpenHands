@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { isMobileUserAgent } from "#/utils/utils";
 import {
   ensureCursorVisible,
   clearEmptyContent,
@@ -73,20 +72,24 @@ export const useChatInputEvents = (
         return;
       }
 
+      // Local convention: reserve Ctrl+Enter in the composer for sending,
+      // including when empty/disabled, so it cannot also trigger Build plan.
+      if (e.ctrlKey && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!disabled && !checkIsContentEmpty()) {
+          handleSubmit();
+        }
+        return;
+      }
+
       if (checkIsContentEmpty()) {
         e.preventDefault();
         increaseHeightForEmptyContent();
         return;
       }
 
-      // Submit on Enter for everything except phones/tablets (where Enter
-      // inserts a newline and the user taps the send button). We gate on the
-      // user agent rather than touch capability so a desktop OS with a
-      // touchscreen (e.g. a Windows 2-in-1) still submits on Enter.
-      if (!isMobileUserAgent() && !e.shiftKey && !disabled) {
-        e.preventDefault();
-        handleSubmit();
-      }
+      // Enter and Shift+Enter retain the browser newline behavior.
     },
     [checkIsContentEmpty, increaseHeightForEmptyContent],
   );
