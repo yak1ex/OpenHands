@@ -51,3 +51,4 @@ build-fresh/
 
 # local
 /start-backend.local.ps1
+/start-server.local.ps1
