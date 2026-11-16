@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { readCloudConversationFile } from "#/api/cloud/conversation-service.api";
 import { getActiveBackend } from "#/api/backend-registry/active-store";
+import { resolveWorkspaceFilePath } from "#/utils/read-workspace-file";
 import { getGitPath } from "#/utils/get-git-path";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
 import { useRuntimeIsReady } from "#/hooks/use-runtime-is-ready";
@@ -170,15 +171,9 @@ export function useWorkspaceFileContent(relativePath: string | null) {
   // same way the diff view builds its git-diff path (see use-unified-git-diff),
   // then force a leading slash since `getGitPath`'s default is relative.
   const gitPath = getGitPath(selectedRepository, workingDir);
-  const workspaceRoot = /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(gitPath)
-    ? gitPath
-    : `/${gitPath}`;
-  let absoluteFilePath: string | null = null;
-  if (relativePath) {
-    absoluteFilePath = /^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(relativePath)
-      ? relativePath
-      : `${workspaceRoot.replace(/[\\/]$/, "")}/${relativePath.replace(/^[/\\]+/, "")}`;
-  }
+  const absoluteFilePath = relativePath
+    ? resolveWorkspaceFilePath(relativePath, gitPath)
+    : null;
 
   return useQuery<WorkspaceFileContent>({
     queryKey: [

@@ -23,6 +23,10 @@ import {
 const useWorkspaceFilesMock = vi.fn();
 const useWorkspaceFileContentMock = vi.fn();
 const useActiveConversationMock = vi.fn();
+const downloadFileMock = vi.fn();
+vi.mock("#/api/runtime-service/agent-server-runtime-service", () => ({
+  default: { downloadFile: (...args: unknown[]) => downloadFileMock(...args) },
+}));
 
 vi.mock("#/hooks/query/use-workspace-files", () => ({
   useWorkspaceFiles: () => useWorkspaceFilesMock(),
@@ -811,6 +815,7 @@ describe("FilesTab", () => {
     beforeEach(() => {
       vi.stubGlobal("fetch", fetchMock);
       fetchMock.mockReset();
+      downloadFileMock.mockReset();
       // jsdom does not implement object URLs, which the new-window link needs.
       vi.stubGlobal(
         "URL",
@@ -824,44 +829,53 @@ describe("FilesTab", () => {
       vi.mocked(displayErrorToast).mockClear();
     });
 
-    it("saves a local file's bytes from the workspace fileserver under its own name", async () => {
-      // Arrange
-      const staticUrl =
-        "http://localhost:3000/api/conversations/c1/workspace/assets/logo.png";
-      useWorkspaceFileContentMock.mockReturnValue({
-        data: {
-          path: "assets/logo.png",
-          kind: "image",
-          text: null,
-          staticUrl,
-          mimeType: "image/png",
-        },
-        isLoading: false,
-        isError: false,
-      });
-      const bytes = new Uint8Array([137, 80, 78, 71, 0, 13]);
-      fetchMock.mockResolvedValue({
-        ok: true,
-        blob: async () => new Blob([bytes], { type: "image/png" }),
-      });
-      const user = userEvent.setup();
-      openFile("assets/logo.png");
-      renderTab();
+    it.each(["http://localhost:18000", "http://remote.example:18000"])(
+      "saves original bytes using header auth at %s without a cookie",
+      async (host) => {
+        // Arrange
+        useActiveConversationMock.mockReturnValue({
+          data: {
+            conversation_url: `${host}/api/conversations/c1`,
+            session_api_key: "test-key",
+            workspace: { working_dir: "/workspace/project" },
+          },
+        });
+        const staticUrl =
+          "http://localhost:3000/api/conversations/c1/workspace/assets/logo.png";
+        useWorkspaceFileContentMock.mockReturnValue({
+          data: {
+            path: "assets/logo.png",
+            kind: "image",
+            text: null,
+            staticUrl,
+            mimeType: "image/png",
+          },
+          isLoading: false,
+          isError: false,
+        });
+        const bytes = new Uint8Array([137, 80, 78, 71, 0, 13]);
+        downloadFileMock.mockResolvedValue(bytes.buffer);
+        const user = userEvent.setup();
+        openFile("assets/logo.png");
+        renderTab();
 
-      // Act
-      await user.click(screen.getByTestId("files-tab-download"));
+        // Act
+        await user.click(screen.getByTestId("files-tab-download"));
 
-      // Assert
-      await waitFor(() => expect(downloadBlob).toHaveBeenCalledOnce());
-      expect(fetchMock).toHaveBeenCalledWith(staticUrl, {
-        credentials: "include",
-        cache: "no-cache",
-      });
-      const [blob, filename] = vi.mocked(downloadBlob).mock.calls[0];
-      expect(filename).toBe("logo.png");
-      expect(blob.type).toBe("image/png");
-      expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
-    });
+        // Assert
+        await waitFor(() => expect(downloadBlob).toHaveBeenCalledOnce());
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(downloadFileMock).toHaveBeenCalledWith(
+          `${host}/api/conversations/c1`,
+          "test-key",
+          "/workspace/project/assets/logo.png",
+        );
+        const [blob, filename] = vi.mocked(downloadBlob).mock.calls[0];
+        expect(filename).toBe("logo.png");
+        expect(blob.type).toBe("image/png");
+        expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
+      },
+    );
 
     it("saves a Cloud text file from its decoded text with the file's MIME type", async () => {
       // Arrange
@@ -952,7 +966,7 @@ describe("FilesTab", () => {
 
     it("shows an error and saves nothing when the local download fails", async () => {
       // Arrange: the default fixture is a local `index.html`.
-      fetchMock.mockResolvedValue({ ok: false, status: 404 });
+      downloadFileMock.mockRejectedValue(new Error("Unauthorized"));
       const user = userEvent.setup();
       openFile("index.html");
       renderTab();
