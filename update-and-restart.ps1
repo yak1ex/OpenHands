@@ -11,9 +11,12 @@ if (Test-Path $GIT) {
     $GIT = 'git'
 }
 
+$local_script = if ($Server) { 'start-server.local.ps1' } else { 'start-backend.local.ps1' }
+. (Join-Path $PSScriptRoot $local_script)
 $folders = @(
     $PSScriptRoot
-    (Join-Path $PSScriptRoot '../software-agent-sdk')
+    $env:OH_AGENT_SERVER_LOCAL_PATH
+    $env:OH_AUTOMATION_LOCAL_PATH
 )
 
 foreach ($folder in $folders) {
