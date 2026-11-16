@@ -23,7 +23,8 @@ function WorkspaceFilePreviewContent() {
   const version =
     Number.isSafeInteger(rawVersion) && rawVersion >= 0 ? rawVersion : 0;
   const query = useWorkspaceFileContent(path);
-  const { data: conversation } = useActiveConversation();
+  const conversationQuery = useActiveConversation();
+  const conversation = conversationQuery.data;
   const { path: filePath, staticUrl, mimeType } = query.data ?? {};
   const fileConversation = {
     conversation_url: conversation?.conversation_url,
@@ -66,6 +67,10 @@ function WorkspaceFilePreviewContent() {
         type: mimeType,
       });
     },
+    // This window is a snapshot. Focus/reconnect must not replace a live
+    // document (and revoke its blob URL) while it is being displayed.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
     retry: false,
     meta: { disableToast: true },
   });
@@ -80,10 +85,31 @@ function WorkspaceFilePreviewContent() {
   }, [preview.data]);
 
   if (
-    query.isLoading ||
-    (query.data &&
-      !preview.isError &&
-      (!preview.data || source?.blob !== preview.data))
+    !path ||
+    query.isError ||
+    preview.isError ||
+    conversationQuery.isError ||
+    (conversationQuery.isSuccess && !conversation)
+  ) {
+    return (
+      <main
+        role="alert"
+        className="flex h-screen w-full items-center justify-center bg-canvas-base text-sm text-muted"
+      >
+        {(query.error ?? preview.error ?? conversationQuery.error)?.message ??
+          t(I18nKey.FILES$LOAD_ERROR)}
+      </main>
+    );
+  }
+
+  // A disabled dependent query is pending, but isLoading is false until its
+  // prerequisites arrive. Keep startup in Loading instead of flashing Error.
+  if (
+    query.isPending ||
+    !query.data ||
+    !conversation ||
+    !preview.data ||
+    source?.blob !== preview.data
   ) {
     return (
       <main className="flex h-screen w-full items-center justify-center bg-canvas-base text-sm text-muted">
@@ -92,22 +118,15 @@ function WorkspaceFilePreviewContent() {
     );
   }
 
-  if (!path || query.isError || preview.isError || !query.data || !source) {
-    return (
-      <main
-        role="alert"
-        className="flex h-screen w-full items-center justify-center bg-canvas-base text-sm text-muted"
-      >
-        {(query.error ?? preview.error)?.message ?? t(I18nKey.FILES$LOAD_ERROR)}
-      </main>
-    );
-  }
-
   return (
     <iframe
       title={path}
       src={source.url}
-      sandbox={query.data.kind === "pdf" ? undefined : "allow-same-origin"}
+      // New-window reports may render entirely with JavaScript. Omit
+      // allow-same-origin: a Canvas-created blob must not give those scripts
+      // access to Canvas DOM, storage, or credentials. PDFs need no sandbox
+      // because Chromium disables its native PDF viewer inside one.
+      sandbox={query.data.kind === "pdf" ? undefined : "allow-scripts"}
       data-testid="workspace-file-preview-frame"
       className="block h-screen w-full border-0 bg-white"
     />

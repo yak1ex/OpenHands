@@ -1,8 +1,12 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import WorkspaceFilePreview from "#/routes/workspace-file-preview";
 
 const useWorkspaceFileContentMock = vi.fn();
@@ -106,8 +110,14 @@ describe("WorkspaceFilePreview", () => {
     );
     expect(await screen.findByTitle("reports/index.html")).toHaveAttribute(
       "sandbox",
-      "allow-same-origin",
+      "allow-scripts",
     );
+    // Focusing an existing report must preserve its document and script state.
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    expect(downloadFileMock).toHaveBeenCalledOnce();
     view.unmount();
     expect(revokeObjectURLMock).toHaveBeenCalledWith(
       "blob:http://localhost/preview",
@@ -149,6 +159,22 @@ describe("WorkspaceFilePreview", () => {
       "blob:http://localhost/preview",
     );
     expect(fetchMock).toHaveBeenCalledWith(file.staticUrl);
+    expect(downloadFileMock).not.toHaveBeenCalled();
+  });
+  it("keeps a disabled content query in its loading state during startup", () => {
+    useWorkspaceFileContentMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isLoading: false,
+      isError: false,
+    });
+    renderPreview(
+      "/conversations/conv-1/workspace-preview?path=reports%2Findex.html",
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("workspace-file-preview-frame"),
+    ).not.toBeInTheDocument();
     expect(downloadFileMock).not.toHaveBeenCalled();
   });
 });

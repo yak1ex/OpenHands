@@ -102,6 +102,13 @@ The commit and Uncommitted rows reserve the same `7ch` monospace column through
 
 ## Workspace files
 
+New-window workspace previews use authenticated blobs. HTML reports may execute
+scripts only in an opaque-origin sandbox (`allow-scripts` without
+`allow-same-origin`), since these blobs originate from Canvas. Keep the inline
+Files pane's script-blocking policy separate. PDFs remain unsandboxed for the
+native browser viewer. Treat disabled dependent queries as pending during
+startup, and keep an open preview snapshot stable across window focus.
+
 The open-file strip hides the scrollbar through `file-strip-scrollbar-hidden`
 while retaining horizontal scrolling. File discovery uses
 `file-discovery-viewport-height` for its 90vh cap and keeps its vertical
