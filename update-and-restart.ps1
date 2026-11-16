@@ -4,6 +4,7 @@ param(
 )
 
 $GIT = 'c:\cygwin64\bin\git.exe'
+$ORIG_PATH = $env:PATH
 if (Test-Path $GIT) {
     $env:PATH = "c:\cygwin64\bin;$env:PATH"
 } else {
@@ -53,6 +54,7 @@ foreach ($folder in $folders) {
 $script = if ($Server) { 'start-server.ps1' } else { 'start-backend.ps1' }
 
 Push-Location $PSScriptRoot
+$env:PATH = $ORIG_PATH
 try {
     npm ci
     & (Join-Path $PSScriptRoot $script)
