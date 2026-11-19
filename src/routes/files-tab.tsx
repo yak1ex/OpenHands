@@ -45,6 +45,8 @@ import RefreshIcon from "#/icons/u-refresh.svg?react";
 import LinkExternalIcon from "#/icons/link-external.svg?react";
 import DownloadIcon from "#/icons/u-download.svg?react";
 import { useActiveConversation } from "#/hooks/query/use-active-conversation";
+import { SETTINGS_QUERY_KEYS } from "#/hooks/query/query-keys";
+import SettingsService from "#/api/settings-service/settings-service.api";
 import { buildWorkspaceFilePreviewUrl } from "#/utils/workspace-file-preview-url";
 
 /**
@@ -194,6 +196,12 @@ function FilesTab() {
     // new `?v=` URL: the only way to make them skip a cached response.
     bumpWorkspaceMutationCounter();
     try {
+      // Clear cached settings too so File discovery edits saved from another
+      // tab or conversation take effect on Refresh files.
+      SettingsService.invalidateCache();
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_QUERY_KEYS.personal(),
+      });
       await queryClient.invalidateQueries({ queryKey: ["workspace-files"] });
     } finally {
       setIsRefreshing(false);

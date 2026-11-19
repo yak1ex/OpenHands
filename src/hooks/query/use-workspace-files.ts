@@ -74,6 +74,7 @@ function useLocalWorkspaceFiles(enabled: boolean): WorkspaceFilesResult {
         conversationUrl,
         sessionApiKey,
         workingDir!,
+        options,
       );
       if (listing) {
         return { paths: listing.files, isTruncated: listing.truncated };

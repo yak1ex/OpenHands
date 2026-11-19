@@ -10,6 +10,7 @@ import SettingsService from "#/api/settings-service/settings-service.api";
 import { DEFAULT_SETTINGS } from "#/services/settings";
 import { DEFAULT_FILE_DISCOVERY } from "#/utils/workspace-file-discovery";
 import { WorkspaceBrowserService } from "#/api/workspace-browser-service";
+import { SETTINGS_QUERY_KEYS } from "#/hooks/query/query-keys";
 
 vi.mock("#/api/settings-service/settings-service.api", () => ({
   default: { getSettings: vi.fn(), saveSettings: vi.fn() },
@@ -136,6 +137,86 @@ describe("useWorkspaceFiles — local backend", () => {
       expect(result.current.data).toEqual(["repo-a/ spaced .txt"]),
     );
     expect(result.current.truncated).toBe(true);
+    expect(listFilesSpy).toHaveBeenCalledWith(
+      conversation.conversation_url,
+      conversation.session_api_key,
+      "C:\\work",
+      DEFAULT_FILE_DISCOVERY,
+    );
+    expect(executeCommandSpy).not.toHaveBeenCalled();
+  });
+
+  it("forwards persisted file discovery options to /api/file/list and refetches when settings change", async () => {
+    const initialOptions = {
+      excludedPatterns: [".git", "node_modules"],
+      maxFiles: 50,
+      includeSymlinks: false,
+    };
+    const updatedOptions = {
+      excludedPatterns: [".git", "node_modules", "src"],
+      maxFiles: 0,
+      includeSymlinks: true,
+    };
+    vi.mocked(SettingsService.getSettings)
+      .mockResolvedValueOnce({
+        ...DEFAULT_SETTINGS,
+        workspace_file_discovery: {
+          "C:\\work": initialOptions,
+        },
+      })
+      .mockResolvedValueOnce({
+        ...DEFAULT_SETTINGS,
+        workspace_file_discovery: {
+          "C:\\work": updatedOptions,
+        },
+      });
+    useActiveConversationMock.mockReturnValue({
+      data: { ...conversation, workspace: { working_dir: "C:\\work" } },
+    });
+    listFilesSpy
+      .mockResolvedValueOnce({
+        files: ["README.md", "src/app.ts"],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        files: ["README.md"],
+        truncated: false,
+      });
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    function Wrapper({ children }: { children: React.ReactNode }) {
+      return (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      );
+    }
+
+    const { result } = renderHook(() => useWorkspaceFiles(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() =>
+      expect(result.current.data).toEqual(["README.md", "src/app.ts"]),
+    );
+    expect(listFilesSpy).toHaveBeenNthCalledWith(
+      1,
+      conversation.conversation_url,
+      conversation.session_api_key,
+      "C:\\work",
+      initialOptions,
+    );
+
+    await act(() =>
+      client.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all }),
+    );
+    await waitFor(() => expect(result.current.data).toEqual(["README.md"]));
+    expect(listFilesSpy).toHaveBeenNthCalledWith(
+      2,
+      conversation.conversation_url,
+      conversation.session_api_key,
+      "C:\\work",
+      updatedOptions,
+    );
     expect(executeCommandSpy).not.toHaveBeenCalled();
   });
 

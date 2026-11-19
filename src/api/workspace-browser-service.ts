@@ -1,4 +1,5 @@
 import { RemoteWorkspace } from "@openhands/typescript-client/workspace/remote-workspace";
+import type { WorkspaceFileDiscovery } from "#/utils/workspace-file-discovery";
 import { getAgentServerClientOptions } from "./agent-server-client-options";
 import { isSdkHttpStatusError } from "./agent-server-compatibility";
 
@@ -19,11 +20,19 @@ export class WorkspaceBrowserService {
     conversationUrl: string | null | undefined,
     sessionApiKey: string | null | undefined,
     path: string,
+    options?: WorkspaceFileDiscovery,
   ): Promise<WorkspaceFileList | null> {
+    const params: Record<string, unknown> = { path };
+    if (options) {
+      params.limit = options.maxFiles;
+      params.use_default_excludes = false;
+      params.exclude = options.excludedPatterns;
+      params.include_symlinks = options.includeSymlinks;
+    }
     try {
       const response = await new RemoteWorkspace(
         getAgentServerClientOptions({ conversationUrl, sessionApiKey }),
-      ).client.get<WorkspaceFileList>("/api/file/list", { params: { path } });
+      ).client.get<WorkspaceFileList>("/api/file/list", { params });
       return response.data;
     } catch (error) {
       if (isSdkHttpStatusError(error, 404)) return null;
